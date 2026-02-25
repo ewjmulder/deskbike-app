@@ -1,19 +1,26 @@
 import { ipcMain, BrowserWindow } from 'electron'
 import { insertMeasurement } from '../db/queries'
-import type { DiscoveredDevice } from '../ble/scanner'
-import type { DataHandler, DisconnectHandler } from '../ble/connection'
+import {
+  startScan as realStartScan,
+  stopScan as realStopScan
+} from '../ble/scanner'
+import {
+  connect as realConnect,
+  disconnect as realDisconnect
+} from '../ble/connection'
+import {
+  startScan as mockStartScan,
+  stopScan as mockStopScan,
+  connect as mockConnect,
+  disconnect as mockDisconnect
+} from '../ble/mock'
 
 const MOCK = process.env.MOCK_BLE === '1'
 
-const { startScan, stopScan }: {
-  startScan: (onFound: (device: DiscoveredDevice) => void) => void
-  stopScan: () => void
-} = MOCK ? require('../ble/mock') : require('../ble/scanner')
-
-const { connect, disconnect }: {
-  connect: (deviceId: string, onData: DataHandler, onDisconnect: DisconnectHandler) => Promise<void>
-  disconnect: (deviceId: string) => Promise<void>
-} = MOCK ? require('../ble/mock') : require('../ble/connection')
+const startScan = MOCK ? mockStartScan : realStartScan
+const stopScan = MOCK ? mockStopScan : realStopScan
+const connect = MOCK ? mockConnect : realConnect
+const disconnect = MOCK ? mockDisconnect : realDisconnect
 
 export function registerIpcHandlers(win: BrowserWindow): void {
   ipcMain.handle('ble:scan', () => {
