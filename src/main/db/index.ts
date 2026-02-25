@@ -21,5 +21,9 @@ export function initDb(): void {
 
   _db = drizzle(sqlite, { schema })
 
-  migrate(_db, { migrationsFolder: join(__dirname, 'migrations') })
+  const migrationsFolder = app.isPackaged
+    ? join(process.resourcesPath, 'migrations')
+    : join(app.getAppPath(), 'src', 'main', 'db', 'migrations')
+
+  migrate(_db, { migrationsFolder })
 }
