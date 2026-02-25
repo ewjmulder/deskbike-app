@@ -16,6 +16,7 @@ pnpm test         # Run all tests (Vitest)
 pnpm test:watch   # Tests in watch mode
 pnpm db:generate  # Generate Drizzle migrations from schema changes
 pnpm emulator     # Run BLE CSC emulator (needs separate BT adapter on Linux)
+MOCK_BLE=1 pnpm dev  # Start with software BLE mock (no hardware needed)
 ```
 
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
@@ -91,6 +92,8 @@ sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT sensor_id, timestamp_utc,
 The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUID `1816`. It simulates 15–20 km/h and 65–75 RPM using sine/cosine waves.
 
 **Linux constraint:** `noble` (central) and `bleno` (peripheral) cannot share the same Bluetooth adapter. Run the emulator on a second machine, USB BT dongle (`BLENO_HCI_DEVICE_ID=1`), or use the real deskbike sensor instead.
+
+**Software mock (no hardware):** `MOCK_BLE=1 pnpm dev` starts the app with a built-in mock that emits synthetic CSC packets every second (15–20 km/h, 65–75 RPM). The mock device appears as `DeskBike-MOCK` in the scan results.
 
 ## Native module rebuild gotcha
 
