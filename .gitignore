@@ -1,0 +1,9 @@
+node_modules/
+out/
+dist/
+dist-electron/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite
+*.sqlite-journal
