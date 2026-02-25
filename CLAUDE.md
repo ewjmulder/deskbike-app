@@ -23,6 +23,11 @@ After `pnpm install`, native modules are automatically rebuilt for Electron via 
 pnpm electron-rebuild -f -w better-sqlite3 -w @stoprocent/noble
 ```
 
+If `pnpm dev` throws `Error: Electron uninstall`, the Electron binary was not downloaded (pnpm install order issue). Fix:
+```bash
+node node_modules/electron/install.js
+```
+
 ## Architecture
 
 ```
