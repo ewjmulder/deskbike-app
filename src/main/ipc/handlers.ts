@@ -17,6 +17,8 @@ import {
 
 const MOCK = process.env.MOCK_BLE === '1'
 
+console.log(`[BLE] mode: ${MOCK ? 'SOFTWARE MOCK (DeskBike-MOCK)' : 'real BLE scanner'}`)
+
 const startScan = MOCK ? mockStartScan : realStartScan
 const stopScan = MOCK ? mockStopScan : realStopScan
 const connect = MOCK ? mockConnect : realConnect
