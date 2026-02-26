@@ -13,18 +13,27 @@ export default function App() {
   const [lastHex, setLastHex] = useState<string | null>(null)
 
   useEffect(() => {
-    adapter.current = createBleAdapter()
+    console.log('[App] mount — creating BleAdapter')
+    try {
+      adapter.current = createBleAdapter()
+      console.log('[App] BleAdapter created:', adapter.current.constructor.name)
+    } catch (err) {
+      console.error('[App] createBleAdapter failed:', err)
+    }
   }, [])
 
   function handleScan(): void {
+    console.log('[App] handleScan')
     setDevices([])
     setStatus('scanning')
     adapter.current!.startScan((device) => {
+      console.log('[App] device found:', device)
       setDevices((prev) => prev.find((d) => d.id === device.id) ? prev : [...prev, device])
     })
   }
 
   async function handleConnect(deviceId: string): Promise<void> {
+    console.log(`[App] handleConnect: ${deviceId}`)
     setStatus('connecting')
     try {
       await adapter.current!.selectDevice(
@@ -32,8 +41,11 @@ export default function App() {
         (data) => {
           const parsed = parseRawCsc(data)
           const timestampUtc = new Date().toISOString()
+          const hex = Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ')
+          console.log(`[App] data packet: ${hex}`)
+          console.log(`[App] parsed: wheel=${parsed.hasWheelData} crank=${parsed.hasCrankData} wheelRevs=${parsed.wheelRevs} crankRevs=${parsed.crankRevs}`)
           setPacketCount((n) => n + 1)
-          setLastHex(Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' '))
+          setLastHex(hex)
           window.deskbike.saveMeasurement({
             sensorId: deviceId,
             timestampUtc,
@@ -46,16 +58,21 @@ export default function App() {
             crankTime: parsed.crankTime,
           })
         },
-        () => setStatus('disconnected')
+        () => {
+          console.log('[App] disconnected (remote)')
+          setStatus('disconnected')
+        }
       )
+      console.log('[App] connected successfully')
       setStatus('connected')
     } catch (err) {
-      console.error('[BLE] connect failed:', err)
+      console.error('[App] connect failed:', err)
       setStatus('error')
     }
   }
 
   async function handleDisconnect(): Promise<void> {
+    console.log('[App] handleDisconnect')
     await adapter.current!.disconnect()
     setStatus('disconnected')
   }

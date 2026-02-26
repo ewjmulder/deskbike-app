@@ -30,6 +30,8 @@ function buildPacket(): Uint8Array {
   view.setUint16(5, Math.round(wheelTimeTicks) & 0xffff, true)
   view.setUint16(7, Math.round(crankRevs) & 0xffff, true)
   view.setUint16(9, Math.round(crankTimeTicks) & 0xffff, true)
+
+  console.log(`[MockAdapter] packet: speed=${speedKmh.toFixed(1)}km/h cadence=${cadenceRpm.toFixed(1)}rpm wheelRevs=${Math.round(wheelRevs)} crankRevs=${Math.round(crankRevs)}`)
   return buf
 }
 
@@ -37,18 +39,21 @@ export class MockAdapter implements BleAdapter {
   private timer: ReturnType<typeof setInterval> | null = null
 
   startScan(onFound: DeviceFoundHandler): void {
+    console.log('[MockAdapter] startScan → emitting DeskBike-MOCK immediately')
     onFound({ id: MOCK_DEVICE_ID, name: 'DeskBike-MOCK' })
   }
 
   async selectDevice(
-    _deviceId: string,
+    deviceId: string,
     onData: DataHandler,
     _onDisconnect: DisconnectHandler
   ): Promise<void> {
+    console.log(`[MockAdapter] selectDevice: ${deviceId} — starting packet interval (${INTERVAL_MS}ms)`)
     this.timer = setInterval(() => onData(buildPacket()), INTERVAL_MS)
   }
 
   async disconnect(): Promise<void> {
+    console.log('[MockAdapter] disconnect')
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = null

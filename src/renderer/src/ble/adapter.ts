@@ -1,5 +1,8 @@
 // src/renderer/src/ble/adapter.ts
 
+import { MockAdapter } from './mock'
+import { WebBluetoothAdapter } from './web-bluetooth'
+
 export interface DeviceInfo {
   id: string
   name: string
@@ -22,9 +25,12 @@ export interface BleAdapter {
 }
 
 export function createBleAdapter(): BleAdapter {
-  if (window.deskbike.isMock) {
-    // Dynamic import to keep mock out of production bundle
-    return new (require('./mock').MockAdapter)()
+  const isMock = window.deskbike.isMock
+  console.log(`[BLE] createBleAdapter: isMock=${isMock}`)
+  if (isMock) {
+    console.log('[BLE] using MockAdapter')
+    return new MockAdapter()
   }
-  return new (require('./web-bluetooth').WebBluetoothAdapter)()
+  console.log('[BLE] using WebBluetoothAdapter')
+  return new WebBluetoothAdapter()
 }

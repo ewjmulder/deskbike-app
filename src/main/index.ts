@@ -18,6 +18,7 @@ function createWindow(): BrowserWindow {
 
   // Intercept Electron's Bluetooth device picker so our renderer UI acts as the picker
   session.defaultSession.on('select-bluetooth-device', (event, deviceList, callback) => {
+    console.log(`[Main] select-bluetooth-device: ${deviceList.length} device(s)`, deviceList.map((d) => d.deviceName || d.deviceId))
     event.preventDefault()
     setPendingBluetoothCallback(callback)
     win.webContents.send('ble:devices-found', deviceList)
@@ -33,9 +34,11 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  console.log(`[Main] app ready — MOCK_BLE=${process.env['MOCK_BLE'] ?? 'unset'}`)
   initDb()
   registerIpcHandlers()
   createWindow()
+  console.log('[Main] window created')
 })
 
 app.on('window-all-closed', () => {
