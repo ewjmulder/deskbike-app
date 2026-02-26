@@ -5,6 +5,9 @@ import { join } from 'path'
 import { initDb } from './db/index'
 import { registerIpcHandlers, setPendingBluetoothCallback } from './ipc/handlers'
 
+// Required for navigator.bluetooth to be defined in the renderer
+app.commandLine.appendSwitch('enable-experimental-web-platform-features')
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 900,
