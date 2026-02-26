@@ -27,7 +27,11 @@ export class WebBluetoothAdapter implements BleAdapter {
     })
     this.pendingDevice
       .then((d) => console.log(`[WebBluetooth] requestDevice resolved: ${d.name ?? d.id}`))
-      .catch((err) => console.warn('[WebBluetooth] requestDevice rejected:', err))
+      .catch((err) => {
+        const name = err?.name ?? 'unknown'
+        const message = err?.message ?? String(err)
+        console.warn(`[WebBluetooth] requestDevice rejected — ${name}: ${message}`)
+      })
   }
 
   async selectDevice(

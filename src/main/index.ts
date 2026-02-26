@@ -19,6 +19,16 @@ function createWindow(): BrowserWindow {
     }
   })
 
+  // Grant bluetooth permission so requestDevice() is not blocked by permissions policy
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'bluetooth') {
+      console.log('[Main] bluetooth permission granted')
+      callback(true)
+    } else {
+      callback(false)
+    }
+  })
+
   // Intercept Electron's Bluetooth device picker so our renderer UI acts as the picker
   session.defaultSession.on('select-bluetooth-device', (event, deviceList, callback) => {
     console.log(`[Main] select-bluetooth-device: ${deviceList.length} device(s)`, deviceList.map((d) => d.deviceName || d.deviceId))
