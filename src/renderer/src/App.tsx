@@ -8,33 +8,56 @@ import { parseRawCsc } from './ble/csc-parser'
 export default function App() {
   const adapter = useRef<BleAdapter | null>(null)
   const [status, setStatus] = useState('idle')
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
+  const [bleAvailable, setBleAvailable] = useState<boolean | null>(null)
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [packetCount, setPacketCount] = useState(0)
   const [lastHex, setLastHex] = useState<string | null>(null)
 
   useEffect(() => {
-    console.log('[App] mount — creating BleAdapter')
+    const isMock = window.deskbike.isMock
+    const hasNavigatorBluetooth = typeof navigator.bluetooth !== 'undefined'
+    console.log('[App] mount — isMock:', isMock, 'navigator.bluetooth:', hasNavigatorBluetooth)
+    setBleAvailable(isMock || hasNavigatorBluetooth)
+
     try {
       adapter.current = createBleAdapter()
       console.log('[App] BleAdapter created:', adapter.current.constructor.name)
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       console.error('[App] createBleAdapter failed:', err)
+      setErrorDetail(`createBleAdapter: ${msg}`)
+      setStatus('error')
     }
   }, [])
 
   function handleScan(): void {
     console.log('[App] handleScan')
+    if (!adapter.current) {
+      setErrorDetail('adapter not initialised')
+      setStatus('error')
+      return
+    }
     setDevices([])
+    setErrorDetail(null)
     setStatus('scanning')
-    adapter.current!.startScan((device) => {
-      console.log('[App] device found:', device)
-      setDevices((prev) => prev.find((d) => d.id === device.id) ? prev : [...prev, device])
-    })
+    try {
+      adapter.current.startScan((device) => {
+        console.log('[App] device found:', device)
+        setDevices((prev) => prev.find((d) => d.id === device.id) ? prev : [...prev, device])
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[App] startScan failed:', err)
+      setErrorDetail(`startScan: ${msg}`)
+      setStatus('error')
+    }
   }
 
   async function handleConnect(deviceId: string): Promise<void> {
     console.log(`[App] handleConnect: ${deviceId}`)
     setStatus('connecting')
+    setErrorDetail(null)
     try {
       await adapter.current!.selectDevice(
         deviceId,
@@ -66,25 +89,38 @@ export default function App() {
       console.log('[App] connected successfully')
       setStatus('connected')
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
       console.error('[App] connect failed:', err)
+      setErrorDetail(`connect: ${msg}`)
       setStatus('error')
     }
   }
 
   async function handleDisconnect(): Promise<void> {
     console.log('[App] handleDisconnect')
-    await adapter.current!.disconnect()
+    if (!adapter.current) return
+    await adapter.current.disconnect()
     setStatus('disconnected')
   }
 
   return (
     <div style={{ fontFamily: 'monospace', padding: 24 }}>
       <h2>DeskBike — diagnostic view</h2>
-      <p>Status: <strong>{status}</strong></p>
 
-      <button onClick={handleScan}>Scan</button>
+      <p>
+        Mode: <strong>{window.deskbike.isMock ? 'MOCK' : 'Web Bluetooth'}</strong>
+        {' | '}
+        navigator.bluetooth: <strong>{bleAvailable === null ? '…' : bleAvailable ? 'available' : 'MISSING'}</strong>
+      </p>
+
+      <p>Status: <strong>{status}</strong></p>
+      {errorDetail && (
+        <p style={{ color: 'red' }}>Error: {errorDetail}</p>
+      )}
+
+      <button onClick={handleScan} disabled={status === 'scanning' || status === 'connected'}>Scan</button>
       {' '}
-      <button onClick={handleDisconnect}>Disconnect</button>
+      <button onClick={handleDisconnect} disabled={status !== 'connected'}>Disconnect</button>
 
       {devices.length > 0 && (
         <div>
