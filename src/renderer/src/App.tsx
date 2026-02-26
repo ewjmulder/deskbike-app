@@ -28,6 +28,12 @@ export default function App() {
     console.log('[App] mount — isMock:', isMock, 'navigator.bluetooth:', hasNavigatorBluetooth)
     setBleAvailable(isMock || hasNavigatorBluetooth)
 
+    if (hasNavigatorBluetooth) {
+      navigator.bluetooth.getAvailability()
+        .then((available) => console.log('[App] navigator.bluetooth.getAvailability():', available))
+        .catch((err) => console.warn('[App] getAvailability failed:', err?.message ?? err))
+    }
+
     try {
       adapter.current = createBleAdapter()
       console.log('[App] BleAdapter created:', adapter.current.constructor.name)

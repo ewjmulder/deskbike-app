@@ -17,6 +17,16 @@ interface MeasurementData {
   crankTime: number | null
 }
 
+// Minimal Web Bluetooth types not yet in TypeScript's standard lib.dom.d.ts
+interface Bluetooth {
+  getAvailability(): Promise<boolean>
+  requestDevice(options?: RequestDeviceOptions): Promise<BluetoothDevice>
+}
+
+interface Navigator {
+  readonly bluetooth: Bluetooth
+}
+
 interface Window {
   deskbike: {
     isMock: boolean
