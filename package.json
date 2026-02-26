@@ -9,6 +9,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w better-sqlite3 -w @stoprocent/noble",
+    "setup:ble": "sudo setcap cap_net_raw,cap_net_admin+eip node_modules/electron/dist/electron",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",

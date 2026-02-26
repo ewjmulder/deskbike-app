@@ -19,6 +19,12 @@ pnpm emulator     # Run BLE CSC emulator (needs separate BT adapter on Linux)
 MOCK_BLE=1 pnpm dev  # Start with software BLE mock (no hardware needed)
 ```
 
+**Linux BLE permissions (required for real hardware):** noble needs raw HCI socket access. Run once after `pnpm install`, and again after any Electron upgrade:
+```bash
+pnpm setup:ble   # sudo setcap cap_net_raw,cap_net_admin+eip on the Electron binary
+```
+Without this, noble stays in `unknown` state and scanning never starts. Use `MOCK_BLE=1 pnpm dev` to develop without this requirement.
+
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
 ```bash
 pnpm electron-rebuild -f -w better-sqlite3 -w @stoprocent/noble
