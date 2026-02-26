@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseRawCsc, computeDeltas } from '../../src/main/ble/csc-parser'
+import { parseRawCsc, computeDeltas } from '../../src/renderer/src/ble/csc-parser'
 
 describe('parseRawCsc', () => {
   it('parses wheel-only data', () => {
