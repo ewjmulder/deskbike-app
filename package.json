@@ -8,8 +8,7 @@
     "dev:mock": "MOCK_BLE=1 electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "postinstall": "electron-rebuild -f -w better-sqlite3 -w @stoprocent/noble",
-    "setup:ble": "sudo setcap cap_net_raw,cap_net_admin+eip node_modules/electron/dist/electron",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
@@ -32,7 +31,6 @@
   },
   "dependencies": {
     "@abandonware/bleno": "^0.6.1",
-    "@stoprocent/noble": "^1.9.1",
     "better-sqlite3": "^11.8.1",
     "drizzle-orm": "^0.36.4",
     "react": "^18.3.1",
