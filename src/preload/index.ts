@@ -1,19 +1,29 @@
+// src/preload/index.ts
+
 import { contextBridge, ipcRenderer } from 'electron'
 
 contextBridge.exposeInMainWorld('deskbike', {
-  // Renderer → Main (invoke)
-  startScan: () => ipcRenderer.invoke('ble:scan'),
-  connect: (deviceId: string) => ipcRenderer.invoke('ble:connect', deviceId),
-  disconnect: () => ipcRenderer.invoke('ble:disconnect'),
+  // True when MOCK_BLE=1 — renderer uses MockAdapter instead of WebBluetoothAdapter
+  isMock: process.env['MOCK_BLE'] === '1',
 
-  // Main → Renderer (event subscriptions)
-  onBleStatus: (cb: (status: { state: string; deviceName?: string }) => void) => {
-    ipcRenderer.on('ble:status', (_e, v) => cb(v))
+  // Main → Renderer: Electron found BLE devices (fires as scan progresses)
+  onDevicesFound: (cb: (devices: Array<{ deviceId: string; deviceName: string }>) => void) => {
+    ipcRenderer.on('ble:devices-found', (_e, v) => cb(v))
   },
-  onBleData: (cb: (data: { sensorId: string; timestampUtc: string; rawData: number[] }) => void) => {
-    ipcRenderer.on('ble:data', (_e, v) => cb(v))
-  },
-  onDeviceFound: (cb: (device: { id: string; name: string; address: string }) => void) => {
-    ipcRenderer.on('ble:device-found', (_e, v) => cb(v))
-  }
+
+  // Renderer → Main: tell Electron which device the user selected
+  selectBleDevice: (deviceId: string) => ipcRenderer.invoke('ble:select-device', deviceId),
+
+  // Renderer → Main: persist a parsed measurement to the DB
+  saveMeasurement: (data: {
+    sensorId: string
+    timestampUtc: string
+    rawData: number[]
+    hasWheelData: boolean
+    hasCrankData: boolean
+    wheelRevs: number | null
+    wheelTime: number | null
+    crankRevs: number | null
+    crankTime: number | null
+  }) => ipcRenderer.invoke('ble:save-measurement', data),
 })
