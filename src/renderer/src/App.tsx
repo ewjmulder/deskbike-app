@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { createBleAdapter } from './ble/adapter'
 import type { BleAdapter, DeviceInfo } from './ble/adapter'
 import { parseRawCsc } from './ble/csc-parser'
+import { useDevLog } from './useDevLog'
 
 export default function App() {
+  const logs = useDevLog()
+  const logEndRef = useRef<HTMLDivElement>(null)
   const adapter = useRef<BleAdapter | null>(null)
   const [status, setStatus] = useState('idle')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
@@ -13,6 +16,11 @@ export default function App() {
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [packetCount, setPacketCount] = useState(0)
   const [lastHex, setLastHex] = useState<string | null>(null)
+
+  // Auto-scroll log panel to bottom on new entries
+  useEffect(() => {
+    logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [logs])
 
   useEffect(() => {
     const isMock = window.deskbike.isMock
@@ -142,6 +150,30 @@ export default function App() {
           <p>Raw bytes: <code>{lastHex}</code></p>
         </div>
       )}
+
+      <div style={{ marginTop: 24 }}>
+        <h3 style={{ marginBottom: 4 }}>Log ({logs.length})</h3>
+        <div style={{
+          height: 220,
+          overflowY: 'auto',
+          background: '#111',
+          color: '#eee',
+          fontSize: 11,
+          padding: '6px 8px',
+          borderRadius: 4,
+        }}>
+          {logs.map((e, i) => (
+            <div key={i} style={{
+              color: e.level === 'error' ? '#f77' : e.level === 'warn' ? '#fa0' : '#cfc',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
+            }}>
+              {e.ts} {e.message}
+            </div>
+          ))}
+          <div ref={logEndRef} />
+        </div>
+      </div>
     </div>
   )
 }

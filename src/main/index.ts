@@ -24,6 +24,17 @@ function createWindow(): BrowserWindow {
     win.webContents.send('ble:devices-found', deviceList)
   })
 
+  // Forward renderer console output to the main process terminal
+  const levels = ['V', 'I', 'W', 'E']
+  win.webContents.on('console-message', (_e, level, message) => {
+    const prefix = `[renderer:${levels[level] ?? '?'}]`
+    if (level >= 2) {
+      console.error(prefix, message)
+    } else {
+      console.log(prefix, message)
+    }
+  })
+
   if (process.env['ELECTRON_RENDERER_URL']) {
     win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
