@@ -19,15 +19,9 @@ pnpm emulator     # Run BLE CSC emulator (needs separate BT adapter on Linux)
 MOCK_BLE=1 pnpm dev  # Start with software BLE mock (no hardware needed)
 ```
 
-**Linux BLE permissions (required for real hardware):** noble needs raw HCI socket access. Run once after `pnpm install`, and again after any Electron upgrade:
-```bash
-pnpm setup:ble   # sudo setcap cap_net_raw,cap_net_admin+eip on the Electron binary
-```
-Without this, noble stays in `unknown` state and scanning never starts. Use `MOCK_BLE=1 pnpm dev` to develop without this requirement.
-
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
 ```bash
-pnpm electron-rebuild -f -w better-sqlite3 -w @stoprocent/noble
+pnpm electron-rebuild -f -w better-sqlite3
 ```
 
 If `pnpm dev` throws `Error: Electron uninstall`, the Electron binary was not downloaded (pnpm install order issue). Fix:
@@ -39,30 +33,33 @@ node node_modules/electron/install.js
 
 ```
 src/
-  main/          # Electron main process (Node.js) — BLE, SQLite, IPC
-    ble/
-      scanner.ts       # Scans for CSC BLE devices (noble)
-      connection.ts    # Connects and subscribes to CSC notifications
-      csc-parser.ts    # Pure function: parses CSC BLE bytes + computes deltas
+  main/          # Electron main process (Node.js) — SQLite, IPC, BT session
     db/
       schema.ts        # Drizzle ORM schema (all 5 tables)
       index.ts         # DB init: opens SQLite, runs migrations
       queries.ts       # insertMeasurement, getRecentMeasurements
       migrations/      # Auto-generated SQL — never edit manually
     ipc/
-      handlers.ts      # IPC handler registration (ble:scan, ble:connect, ble:disconnect)
-    index.ts           # Electron entry: initDb → createWindow → registerIpcHandlers
+      handlers.ts      # IPC handler registration (ble:select-device, ble:save-measurement)
+    index.ts           # Electron entry: initDb → registerIpcHandlers → createWindow
+                       # Also: session.on('select-bluetooth-device') for Web Bluetooth device picking
   preload/
     index.ts     # contextBridge: exposes window.deskbike to renderer
   renderer/      # React app (Vite, Chromium)
     src/
-      App.tsx          # Currently: diagnostic UI (status, device list, live hex)
+      App.tsx          # Diagnostic UI — scan, connect, live hex display
       env.d.ts         # window.deskbike type declarations
+      ble/
+        adapter.ts       # BleAdapter interface + createBleAdapter() factory
+        web-bluetooth.ts # WebBluetoothAdapter: navigator.bluetooth (real hardware)
+        mock.ts          # MockAdapter: pure JS timer (MOCK_BLE=1)
+        csc-parser.ts    # parseRawCsc + computeDeltas (Uint8Array/DataView)
 scripts/
   emulator.ts    # Standalone BLE CSC peripheral emulator (@abandonware/bleno)
 tests/
   ble/
     csc-parser.test.ts  # Unit tests for CSC parser (9 tests, including rollover)
+    mock.test.ts        # Unit tests for MockAdapter (4 tests)
 docs/
   Architecture.md       # Full architecture reference
   plans/                # Implementation plans (historical)
@@ -77,9 +74,9 @@ docs/
 2. CSC decoded: `has_wheel_data`, `has_crank_data`, `wheel_revs`, `wheel_time`, `crank_revs`, `crank_time`
 3. Deltas: `time_diff_ms`, `*_diff` fields (rollover-corrected with `>>> 0` for uint32, `& 0xffff` for uint16)
 
-**IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. All BLE and DB operations run in the main process.
+**IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. BLE runs entirely in the renderer via Web Bluetooth; only DB persistence goes through IPC.
 
-**BLE library** — `@stoprocent/noble` (maintained fork of noble) for central role. `@abandonware/bleno` for the emulator peripheral role. Both are native modules rebuilt against Electron's Node version.
+**BLE architecture** — BLE central role uses `navigator.bluetooth` (Web Bluetooth API) in the renderer — no native module, no Linux permissions required. The main process registers a `session.on('select-bluetooth-device')` handler that forwards discovered devices to the renderer, so our own UI acts as the device picker. `@abandonware/bleno` is used only for the emulator peripheral role.
 
 ## Database
 
@@ -97,7 +94,7 @@ sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT sensor_id, timestamp_utc,
 
 The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUID `1816`. It simulates 15–20 km/h and 65–75 RPM using sine/cosine waves.
 
-**Linux constraint:** `noble` (central) and `bleno` (peripheral) cannot share the same Bluetooth adapter. Run the emulator on a second machine, USB BT dongle (`BLENO_HCI_DEVICE_ID=1`), or use the real deskbike sensor instead.
+**Linux:** No adapter conflicts — `navigator.bluetooth` (Web Bluetooth, renderer) and `bleno` (peripheral, emulator) use different subsystems. The emulator can run on the same machine as the app.
 
 **Software mock (no hardware):** `MOCK_BLE=1 pnpm dev` starts the app with a built-in mock that emits synthetic CSC packets every second (15–20 km/h, 65–75 RPM). The mock device appears as `DeskBike-MOCK` in the scan results.
 
@@ -112,7 +109,7 @@ The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUI
 | Runtime | Electron 33 |
 | Language | TypeScript 5 |
 | Frontend | React 18 + Vite (electron-vite 3) |
-| BLE central | @stoprocent/noble |
+| BLE central | Web Bluetooth API (navigator.bluetooth) |
 | BLE peripheral (emulator) | @abandonware/bleno |
 | Database | SQLite via better-sqlite3 |
 | ORM | Drizzle ORM + drizzle-kit |
