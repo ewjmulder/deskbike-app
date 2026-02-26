@@ -1,57 +1,25 @@
-import { ipcMain, BrowserWindow } from 'electron'
+// src/main/ipc/handlers.ts
+
+import { ipcMain } from 'electron'
 import { insertMeasurement } from '../db/queries'
-import {
-  startScan as realStartScan,
-  stopScan as realStopScan
-} from '../ble/scanner'
-import {
-  connect as realConnect,
-  disconnect as realDisconnect
-} from '../ble/connection'
-import {
-  startScan as mockStartScan,
-  stopScan as mockStopScan,
-  connect as mockConnect,
-  disconnect as mockDisconnect
-} from '../ble/mock'
 
-const MOCK = process.env.MOCK_BLE === '1'
+let pendingBluetoothCallback: ((deviceId: string) => void) | null = null
 
-console.log(`[BLE] mode: ${MOCK ? 'SOFTWARE MOCK (DeskBike-MOCK)' : 'real BLE scanner'}`)
+export function setPendingBluetoothCallback(cb: ((deviceId: string) => void) | null): void {
+  pendingBluetoothCallback = cb
+}
 
-const startScan = MOCK ? mockStartScan : realStartScan
-const stopScan = MOCK ? mockStopScan : realStopScan
-const connect = MOCK ? mockConnect : realConnect
-const disconnect = MOCK ? mockDisconnect : realDisconnect
-
-export function registerIpcHandlers(win: BrowserWindow): void {
-  ipcMain.handle('ble:scan', () => {
-    startScan((device) => {
-      win.webContents.send('ble:device-found', device)
-    })
-    win.webContents.send('ble:status', { state: 'scanning' })
+export function registerIpcHandlers(): void {
+  // Called by renderer when user clicks a device in our scan UI
+  ipcMain.handle('ble:select-device', (_e, deviceId: string) => {
+    if (pendingBluetoothCallback) {
+      pendingBluetoothCallback(deviceId)
+      pendingBluetoothCallback = null
+    }
   })
 
-  ipcMain.handle('ble:connect', async (_e, deviceId: string) => {
-    stopScan()
-
-    await connect(
-      deviceId,
-      (sensorId, rawData) => {
-        const timestampUtc = new Date().toISOString()
-        insertMeasurement({ sensorId, timestampUtc, rawData })
-        win.webContents.send('ble:data', { sensorId, timestampUtc, rawData: Array.from(rawData) })
-      },
-      (_sensorId) => {
-        win.webContents.send('ble:status', { state: 'disconnected' })
-      }
-    )
-
-    win.webContents.send('ble:status', { state: 'connected', deviceId })
-  })
-
-  ipcMain.handle('ble:disconnect', async (_e, deviceId: string) => {
-    await disconnect(deviceId)
-    win.webContents.send('ble:status', { state: 'disconnected' })
+  // Called by renderer with parsed measurement data for DB persistence
+  ipcMain.handle('ble:save-measurement', (_e, data) => {
+    insertMeasurement(data)
   })
 }

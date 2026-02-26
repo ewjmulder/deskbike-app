@@ -1,7 +1,9 @@
-import { app, BrowserWindow } from 'electron'
+// src/main/index.ts
+
+import { app, BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import { initDb } from './db/index'
-import { registerIpcHandlers } from './ipc/handlers'
+import { registerIpcHandlers, setPendingBluetoothCallback } from './ipc/handlers'
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -12,6 +14,13 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false
     }
+  })
+
+  // Intercept Electron's Bluetooth device picker so our renderer UI acts as the picker
+  session.defaultSession.on('select-bluetooth-device', (event, deviceList, callback) => {
+    event.preventDefault()
+    setPendingBluetoothCallback(callback)
+    win.webContents.send('ble:devices-found', deviceList)
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -25,8 +34,8 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   initDb()
-  const win = createWindow()
-  registerIpcHandlers(win)
+  registerIpcHandlers()
+  createWindow()
 })
 
 app.on('window-all-closed', () => {
