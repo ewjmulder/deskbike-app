@@ -1,18 +1,24 @@
+// src/main/db/queries.ts
+
 import { eq, desc } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { getDb } from './index'
 import { measurements } from './schema'
-import { parseRawCsc, computeDeltas, CscRawFields } from '../ble/csc-parser'
 
 export interface InsertMeasurementInput {
   sensorId: string
   timestampUtc: string  // ISO 8601
-  rawData: Buffer
+  rawData: number[]     // Uint8Array serialized as number[] for IPC transfer
+  hasWheelData: boolean
+  hasCrankData: boolean
+  wheelRevs: number | null
+  wheelTime: number | null
+  crankRevs: number | null
+  crankTime: number | null
 }
 
 export function insertMeasurement(input: InsertMeasurementInput): void {
   const db = getDb()
-  const parsed = parseRawCsc(input.rawData)
 
   const prev = db
     .select()
@@ -22,43 +28,47 @@ export function insertMeasurement(input: InsertMeasurementInput): void {
     .limit(1)
     .all()[0]
 
-  const prevFields: CscRawFields | null = prev
-    ? {
-        hasWheelData: prev.hasWheelData,
-        hasCrankData: prev.hasCrankData,
-        wheelRevs: prev.wheelRevs,
-        wheelTime: prev.wheelTime,
-        crankRevs: prev.crankRevs,
-        crankTime: prev.crankTime
-      }
-    : null
-
   const timeDiffMs = prev
     ? new Date(input.timestampUtc).getTime() - new Date(prev.timestampUtc).getTime()
     : null
 
-  const deltas =
-    prevFields && timeDiffMs !== null
-      ? computeDeltas(parsed, prevFields, timeDiffMs)
-      : null
+  let wheelRevsDiff: number | null = null
+  let wheelTimeDiff: number | null = null
+  let crankRevsDiff: number | null = null
+  let crankTimeDiff: number | null = null
+
+  if (prev && timeDiffMs !== null) {
+    if (input.hasWheelData && prev.hasWheelData &&
+        input.wheelRevs !== null && prev.wheelRevs !== null &&
+        input.wheelTime !== null && prev.wheelTime !== null) {
+      wheelRevsDiff = (input.wheelRevs - prev.wheelRevs) >>> 0
+      wheelTimeDiff = (input.wheelTime - prev.wheelTime) & 0xffff
+    }
+    if (input.hasCrankData && prev.hasCrankData &&
+        input.crankRevs !== null && prev.crankRevs !== null &&
+        input.crankTime !== null && prev.crankTime !== null) {
+      crankRevsDiff = (input.crankRevs - prev.crankRevs) & 0xffff
+      crankTimeDiff = (input.crankTime - prev.crankTime) & 0xffff
+    }
+  }
 
   db.insert(measurements)
     .values({
       id: randomUUID(),
       sensorId: input.sensorId,
       timestampUtc: input.timestampUtc,
-      rawData: input.rawData,
-      hasWheelData: parsed.hasWheelData,
-      hasCrankData: parsed.hasCrankData,
-      wheelRevs: parsed.wheelRevs,
-      wheelTime: parsed.wheelTime,
-      crankRevs: parsed.crankRevs,
-      crankTime: parsed.crankTime,
-      timeDiffMs: deltas?.timeDiffMs ?? null,
-      wheelRevsDiff: deltas?.wheelRevsDiff ?? null,
-      wheelTimeDiff: deltas?.wheelTimeDiff ?? null,
-      crankRevsDiff: deltas?.crankRevsDiff ?? null,
-      crankTimeDiff: deltas?.crankTimeDiff ?? null
+      rawData: Buffer.from(input.rawData),
+      hasWheelData: input.hasWheelData,
+      hasCrankData: input.hasCrankData,
+      wheelRevs: input.wheelRevs,
+      wheelTime: input.wheelTime,
+      crankRevs: input.crankRevs,
+      crankTime: input.crankTime,
+      timeDiffMs,
+      wheelRevsDiff,
+      wheelTimeDiff,
+      crankRevsDiff,
+      crankTimeDiff
     })
     .run()
 }
