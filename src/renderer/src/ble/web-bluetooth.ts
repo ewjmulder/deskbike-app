@@ -21,9 +21,12 @@ export class WebBluetoothAdapter implements BleAdapter {
 
     // requestDevice() starts BLE scanning and "hangs" until selectDevice() is called.
     // Must be called synchronously inside a user gesture handler (button click).
-    console.log('[WebBluetooth] calling navigator.bluetooth.requestDevice (CSC service 0x1816)')
+    // acceptAllDevices + optionalServices so we can see any BLE device during debugging.
+    // Switch back to filters:[{services:[CSC_SERVICE]}] once scanning works end-to-end.
+    console.log('[WebBluetooth] calling navigator.bluetooth.requestDevice (acceptAllDevices)')
     this.pendingDevice = navigator.bluetooth.requestDevice({
-      filters: [{ services: [CSC_SERVICE] }]
+      acceptAllDevices: true,
+      optionalServices: [CSC_SERVICE]
     })
     this.pendingDevice
       .then((d) => console.log(`[WebBluetooth] requestDevice resolved: ${d.name ?? d.id}`))

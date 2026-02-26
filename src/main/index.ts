@@ -19,14 +19,10 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  // Grant bluetooth permission so requestDevice() is not blocked by permissions policy
+  // Log all permission requests so we can see exactly what Chromium asks for
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    if (permission === 'bluetooth') {
-      console.log('[Main] bluetooth permission granted')
-      callback(true)
-    } else {
-      callback(false)
-    }
+    console.log(`[Main] permission requested: "${permission}" → granted`)
+    callback(true)
   })
 
   // Intercept Electron's Bluetooth device picker so our renderer UI acts as the picker
