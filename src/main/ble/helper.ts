@@ -35,14 +35,22 @@ export class BleHelper {
   }
 
   start(): void {
-    const helperPath = app.isPackaged
-      ? join(process.resourcesPath, 'helpers', 'ble_helper.py')
-      : join(app.getAppPath(), 'src', 'helpers', 'ble_helper.py')
+    let helperBin: string
+    let helperArgs: string[]
 
-    const venvPython = join(app.getAppPath(), '.venv', 'bin', 'python3')
-    const pythonBin = !app.isPackaged && existsSync(venvPython) ? venvPython : 'python3'
-    console.log(`[BleHelper] spawning ${pythonBin} ${helperPath}`)
-    this.process = spawn(pythonBin, [helperPath])
+    if (app.isPackaged) {
+      const ext = process.platform === 'win32' ? '.exe' : ''
+      helperBin = join(process.resourcesPath, 'helpers', `ble_helper${ext}`)
+      helperArgs = []
+    } else {
+      const helperPath = join(app.getAppPath(), 'src', 'helpers', 'ble_helper.py')
+      const venvPython = join(app.getAppPath(), '.venv', 'bin', 'python3')
+      helperBin = existsSync(venvPython) ? venvPython : 'python3'
+      helperArgs = [helperPath]
+    }
+
+    console.log(`[BleHelper] spawning ${helperBin} ${helperArgs.join(' ')}`)
+    this.process = spawn(helperBin, helperArgs)
 
     const rl = createInterface({ input: this.process.stdout! })
     rl.on('line', (line) => {
@@ -57,7 +65,9 @@ export class BleHelper {
 
     this.process.on('error', (err: NodeJS.ErrnoException) => {
       const hint = err.code === 'ENOENT'
-        ? ' (is python3 installed and on PATH?)'
+        ? app.isPackaged
+          ? ' (ble_helper binary missing — was the app built with pnpm dist?)'
+          : ' (is python3 installed and on PATH?)'
         : ''
       console.error(`[BleHelper] spawn error:${hint}`, err)
       this.onEvent?.({ type: 'error', message: `Failed to start BLE helper: ${err.message}${hint}` })
