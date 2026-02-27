@@ -13,7 +13,7 @@
     "build": "electron-vite build",
     "build:helper": "tsx scripts/build-ble-helper.ts",
     "preview": "electron-vite preview",
-    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "postinstall": "electron-builder install-app-deps",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",

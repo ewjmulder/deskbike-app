@@ -40,7 +40,9 @@ jobs:
           uv pip install -r requirements.txt
 
       - name: Install Node dependencies
-        run: pnpm install --ignore-scripts
+        run: pnpm install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
       - name: Build BLE helper binary
         run: pnpm build:helper
