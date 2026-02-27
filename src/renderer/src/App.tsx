@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import DiagnosticTab from './DiagnosticTab'
 import HistoryTab from './HistoryTab'
+import WidgetView from './components/widget/WidgetView'
 
 type Tab = 'live' | 'history'
 
@@ -12,6 +13,10 @@ const TAB_LABELS: Record<Tab, string> = {
 }
 
 export default function App() {
+  if (window.deskbike.isWidget()) {
+    return <WidgetView />
+  }
+
   const [activeTab, setActiveTab] = useState<Tab>('live')
 
   return (
