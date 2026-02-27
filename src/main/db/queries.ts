@@ -151,8 +151,9 @@ export function getSetting<T>(key: string): T | null {
 
 export function setSetting<T>(key: string, value: T): void {
   const db = getDb()
+  const encoded = JSON.stringify(value)
   db.insert(settings)
-    .values({ key, value: JSON.stringify(value) })
-    .onConflictDoUpdate({ target: settings.key, set: { value: JSON.stringify(value) } })
+    .values({ key, value: encoded })
+    .onConflictDoUpdate({ target: settings.key, set: { value: encoded } })
     .run()
 }
