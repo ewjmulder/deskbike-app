@@ -157,3 +157,13 @@ export function setSetting<T>(key: string, value: T): void {
     .onConflictDoUpdate({ target: settings.key, set: { value: encoded } })
     .run()
 }
+
+export function getSensorsWithSessions(): string[] {
+  const db = getDb()
+  const rows = db
+    .selectDistinct({ sensorId: sessions.sensorId })
+    .from(sessions)
+    .where(isNotNull(sessions.endedAt))
+    .all()
+  return rows.map((r) => r.sensorId)
+}
