@@ -1,21 +1,26 @@
 // src/main/ipc/handlers.ts
 
-import { ipcMain, WebContents } from 'electron'
-import { insertMeasurement, InsertMeasurementInput, startSession, endSession, getSessionHistory, getSensorsWithSessions } from '../db/queries'
+import { ipcMain } from 'electron'
+import {
+  insertMeasurement, InsertMeasurementInput,
+  startSession, endSession, getSessionHistory,
+  getSetting, setSetting,
+  getSensorsWithSessions,
+} from '../db/queries'
 import type { IBleHelper } from '../ble/helper'
+import type { WindowManager } from '../windows'
 
-export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper): void {
+export function registerIpcHandlers(windowManager: WindowManager, helper: IBleHelper): void {
   console.log('[IPC] registerIpcHandlers')
 
   let pendingConnectResolve: (() => void) | null = null
   let pendingConnectReject: ((err: Error) => void) | null = null
 
-  // Forward helper events to renderer
   helper.setEventHandler((event) => {
     console.log(`[IPC] helper event: ${event.type}`)
     switch (event.type) {
       case 'device':
-        webContents.send('ble:device-found', { id: event.id, name: event.name })
+        windowManager.broadcast('ble:device-found', { id: event.id, name: event.name })
         break
       case 'connected':
         pendingConnectResolve?.()
@@ -23,10 +28,10 @@ export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper
         pendingConnectReject = null
         break
       case 'data':
-        webContents.send('ble:data', event.raw)
+        windowManager.broadcast('ble:data', event.raw)
         break
       case 'disconnected':
-        webContents.send('ble:disconnected')
+        windowManager.broadcast('ble:disconnected')
         break
       case 'error':
         if (pendingConnectReject) {
@@ -34,7 +39,7 @@ export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper
           pendingConnectResolve = null
           pendingConnectReject = null
         } else {
-          webContents.send('ble:error', event.message)
+          windowManager.broadcast('ble:error', event.message)
         }
         break
     }
@@ -47,7 +52,6 @@ export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper
 
   ipcMain.handle('ble:connect', (_e, deviceId: string) => {
     console.log(`[IPC] ble:connect → ${deviceId}`)
-    // Reject any in-flight connect promise before starting a new one
     pendingConnectReject?.(new Error('New connect request superseded previous one'))
     pendingConnectResolve = null
     pendingConnectReject = null
@@ -91,5 +95,28 @@ export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper
   ipcMain.handle('session:get-sensors', () => {
     console.log('[IPC] session:get-sensors')
     return getSensorsWithSessions()
+  })
+
+  ipcMain.handle('settings:get', (_e, key: string) => {
+    return getSetting(key)
+  })
+
+  ipcMain.handle('settings:set', (_e, key: string, value: unknown) => {
+    setSetting(key, value)
+  })
+
+  ipcMain.handle('widget:show', () => {
+    console.log('[IPC] widget:show')
+    windowManager.showWidget()
+  })
+
+  ipcMain.handle('widget:hide', () => {
+    console.log('[IPC] widget:hide')
+    windowManager.hideWidget()
+  })
+
+  ipcMain.handle('widget:toggle', () => {
+    console.log('[IPC] widget:toggle')
+    windowManager.toggleWidget()
   })
 }
