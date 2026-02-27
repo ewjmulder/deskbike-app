@@ -2,6 +2,10 @@
   "name": "deskbike-app",
   "version": "0.1.0",
   "description": "Cross-platform desk bike statistics app",
+  "author": {
+    "name": "Bytecraft Digital",
+    "email": "info@bytecraftdigital.nl"
+  },
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
