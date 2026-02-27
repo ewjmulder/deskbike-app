@@ -120,7 +120,7 @@ export function endSession(sessionId: string, endedAt: string): void {
   db.update(sessions)
     .set({
       endedAt,
-      durationS: Math.round(stats.durationS),
+      durationS: stats.durationS,
       distanceM: stats.distanceM,
       avgSpeedKmh: stats.avgSpeedKmh,
       maxSpeedKmh: stats.maxSpeedKmh,
