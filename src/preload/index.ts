@@ -89,4 +89,20 @@ contextBridge.exposeInMainWorld('deskbike', {
     console.log('[Preload] getSensors')
     return ipcRenderer.invoke('session:get-sensors')
   },
+
+  isWidget: (): boolean => {
+    return new URLSearchParams(window.location.search).get('view') === 'widget'
+  },
+
+  getSetting: <T>(key: string): Promise<T | null> => {
+    return ipcRenderer.invoke('settings:get', key)
+  },
+
+  setSetting: (key: string, value: unknown): Promise<void> => {
+    return ipcRenderer.invoke('settings:set', key, value)
+  },
+
+  widgetShow: (): Promise<void> => ipcRenderer.invoke('widget:show'),
+  widgetHide: (): Promise<void> => ipcRenderer.invoke('widget:hide'),
+  widgetToggle: (): Promise<void> => ipcRenderer.invoke('widget:toggle'),
 })

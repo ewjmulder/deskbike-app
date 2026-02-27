@@ -46,5 +46,11 @@ interface Window {
     sessionEnd: (sessionId: string, endedAt: string) => Promise<void>
     getSessionHistory: (sensorId: string) => Promise<SessionRecord[]>
     getSensors: () => Promise<string[]>
+    isWidget: () => boolean
+    getSetting: <T>(key: string) => Promise<T | null>
+    setSetting: (key: string, value: unknown) => Promise<void>
+    widgetShow: () => Promise<void>
+    widgetHide: () => Promise<void>
+    widgetToggle: () => Promise<void>
   }
 }
