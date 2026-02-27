@@ -20,7 +20,6 @@ Events (stdout):
 
 import asyncio
 import json
-import os
 import signal
 import sys
 from typing import Any
@@ -29,14 +28,6 @@ from bleak import BleakScanner, BleakClient
 CSC_SERVICE = "00001816-0000-1000-8000-00805f9b34fb"
 CSC_MEASUREMENT = "00002a5b-0000-1000-8000-00805f9b34fb"
 CSC_MEASUREMENT_SHORT = "2a5b"
-
-
-def get_bleak_kwargs() -> dict:
-    # Linux-only: allow pinning scanner/client to a specific adapter (e.g. hci0).
-    if not sys.platform.startswith("linux"):
-        return {}
-    adapter = os.environ.get("BLEAK_ADAPTER")
-    return {"adapter": adapter} if adapter else {}
 
 
 def normalize_uuid(uuid: str) -> str:
@@ -76,7 +67,6 @@ class BleManager:
         # Reset event so stale signals from previous sessions don't cause immediate exit
         self._connect_event.clear()
         seen: set[str] = set()
-        bleak_kwargs = get_bleak_kwargs()
 
         def on_detection(device, ad_data) -> None:
             if not has_csc_service(ad_data):
@@ -89,14 +79,13 @@ class BleManager:
         # Prefer software filtering over backend service_uuids filter.
         # On some BlueZ setups the backend filter is unreliable and can
         # interfere with subsequent service discovery during connect.
-        async with BleakScanner(on_detection, **bleak_kwargs):
+        async with BleakScanner(on_detection):
             await self._connect_event.wait()
         # Scanner context is exited here; adapter is released before connect() proceeds
 
     async def connect(self, device_id: str) -> None:
         # Reset event so stale disconnects don't cause immediate exit
         self._disconnect_event.clear()
-        bleak_kwargs = get_bleak_kwargs()
 
         # Wait for scan task to fully finish (adapter released) before connecting
         if self._scan_task is not None and not self._scan_task.done():
@@ -115,11 +104,11 @@ class BleManager:
                 target = self._discovered_devices.get(device_id)
                 if target is None:
                     resolved_device = await BleakScanner.find_device_by_address(
-                        device_id, timeout=4.0, **bleak_kwargs
+                        device_id, timeout=4.0
                     )
                     target = resolved_device or device_id
 
-                async with BleakClient(target, disconnected_callback=on_disconnect, **bleak_kwargs) as client:
+                async with BleakClient(target, disconnected_callback=on_disconnect) as client:
                     measurement_char = None
                     available_chars: list[str] = []
 
@@ -160,8 +149,7 @@ class BleManager:
                         known = ", ".join(sorted(set(available_chars))) or "none"
                         raise RuntimeError(
                             f"Characteristic {CSC_MEASUREMENT} was not found. "
-                            f"Discovered characteristics: {known}. "
-                            f"If using emulator on dongle, try BLEAK_ADAPTER=hci0."
+                            f"Discovered characteristics: {known}."
                         )
 
                     async def on_notify(_char, data: bytearray) -> None:

@@ -9,11 +9,8 @@
 
 **Goal:** Bootstrap the Electron + TypeScript project and implement the full pipeline: CSC BLE sensor (real or emulated) → CSC parser → SQLite `measurements` table, with a minimal React UI to verify live data is flowing.
 
-**Architecture:** `electron-vite` compiles main (Node.js) and renderer (React) processes from a single config. The main process owns BLE via `@stoprocent/noble` and SQLite via `better-sqlite3` + Drizzle ORM. A standalone emulator script uses `@abandonware/bleno` to advertise a real CSC BLE peripheral at 15–20 km/h. The CSC parser is a pure TypeScript function, unit-tested with Vitest before being wired into the pipeline.
 
-**Tech Stack:** Electron 33, TypeScript 5, React 18, electron-vite 3, pnpm, better-sqlite3, Drizzle ORM + drizzle-kit, @stoprocent/noble, @abandonware/bleno, Vitest
 
-**Linux BLE note:** `@stoprocent/noble` (central) and `@abandonware/bleno` (peripheral) cannot share the same Bluetooth adapter simultaneously. Run the emulator on a second machine, a USB BT dongle (`BLENO_HCI_DEVICE_ID=1`), or a phone app (e.g. nRF Connect). Alternatively, test with the real deskbike sensor.
 
 ---
 
@@ -45,7 +42,6 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "emulator": "tsx scripts/emulator.ts"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
@@ -63,7 +59,6 @@
     "vitest": "^2.1.9"
   },
   "dependencies": {
-    "@abandonware/bleno": "^0.6.1",
     "@stoprocent/noble": "^1.9.1",
     "better-sqlite3": "^11.8.1",
     "drizzle-orm": "^0.36.4",
@@ -1052,25 +1047,16 @@ git commit -m "feat: add minimal renderer UI for live BLE diagnostic view"
 
 ---
 
-## Task 9: CSC emulator script
 
 **Files:**
-- Create: `scripts/emulator.ts`
 
-The emulator advertises as a real BLE CSC peripheral. It simulates a rider going 15–20 km/h with a sine wave, and 65–75 RPM cadence.
 
-**Step 1: Write `scripts/emulator.ts`**
 
 ```typescript
-// scripts/emulator.ts
-// Run with: pnpm emulator
 // Requires a separate Bluetooth adapter from the main app on Linux.
-// Uses @abandonware/bleno to advertise a real CSC BLE peripheral.
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const bleno = require('@abandonware/bleno')
 
-const DEVICE_NAME = 'DeskBike-EMU'
 const CSC_SERVICE_UUID = '1816'
 const CSC_MEASUREMENT_UUID = '2a5b'
 const CSC_FEATURE_UUID = '2a5c'
@@ -1108,7 +1094,6 @@ function buildPacket(): Buffer {
 }
 
 // CSC Measurement Characteristic — notify only
-class CscMeasurementCharacteristic extends bleno.Characteristic {
   private _timer: ReturnType<typeof setInterval> | null = null
   private _notify: ((data: Buffer) => void) | null = null
 
@@ -1135,7 +1120,6 @@ class CscMeasurementCharacteristic extends bleno.Characteristic {
 }
 
 // CSC Feature Characteristic — read only, advertises wheel+crank support
-class CscFeatureCharacteristic extends bleno.Characteristic {
   constructor() {
     super({
       uuid: CSC_FEATURE_UUID,
@@ -1146,7 +1130,6 @@ class CscFeatureCharacteristic extends bleno.Characteristic {
 }
 
 // CSC Primary Service
-class CscService extends bleno.PrimaryService {
   constructor() {
     super({
       uuid: CSC_SERVICE_UUID,
@@ -1159,48 +1142,36 @@ class CscService extends bleno.PrimaryService {
 }
 
 // Main
-bleno.on('stateChange', (state: string) => {
   console.log(`Bluetooth state: ${state}`)
   if (state === 'poweredOn') {
-    bleno.startAdvertising(DEVICE_NAME, [CSC_SERVICE_UUID])
   } else {
-    bleno.stopAdvertising()
   }
 })
 
-bleno.on('advertisingStart', (err: Error | null) => {
   if (err) {
     console.error('Failed to start advertising:', err)
     return
   }
   console.log(`Advertising as "${DEVICE_NAME}" with CSC service`)
-  bleno.setServices([new CscService()])
 })
 
-bleno.on('advertisingStop', () => console.log('Advertising stopped'))
 
 process.on('SIGINT', () => {
-  console.log('\nStopping emulator...')
-  bleno.stopAdvertising()
   process.exit(0)
 })
 ```
 
-**Step 2: Test the emulator in isolation**
 
 On a machine/adapter separate from the one running the app:
 
 ```bash
-pnpm emulator
 ```
 
 Expected output:
 ```
 Bluetooth state: poweredOn
-Advertising as "DeskBike-EMU" with CSC service
 ```
 
-Then click **Scan** in the app, find `DeskBike-EMU`, click **Connect**. Expected:
 ```
 Client subscribed to CSC Measurement
   Sending: 03 xx xx xx xx xx xx xx xx xx xx  (~17.x km/h)
@@ -1212,8 +1183,6 @@ And in the app UI: packet count increments every second, raw hex bytes shown.
 **Step 3: Commit**
 
 ```bash
-git add scripts/emulator.ts
-git commit -m "feat: add BLE CSC emulator simulating 15-20 km/h at 65-75 RPM"
 ```
 
 ---
@@ -1250,10 +1219,8 @@ pnpm dev         # Electron app opens, UI shows "idle"
 Then in a separate terminal (separate BT adapter on Linux):
 
 ```bash
-pnpm emulator    # Starts advertising DeskBike-EMU
 ```
 
-In the app: Scan → find DeskBike-EMU → Connect → verify packet counter increments and raw bytes appear. Check the SQLite database:
 
 ```bash
 sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT id, sensor_id, timestamp_utc, has_wheel_data, wheel_revs, wheel_time, wheel_revs_diff, wheel_time_diff FROM measurements LIMIT 5;"

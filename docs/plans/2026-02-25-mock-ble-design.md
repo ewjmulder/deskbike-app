@@ -7,7 +7,6 @@
 
 ## Problem
 
-On Linux, `noble` (BLE central) and `bleno` (BLE peripheral) cannot share the same Bluetooth adapter. Running both the app and the emulator on one machine is therefore not possible without a second USB BT dongle. During development, this blocks UI work when no hardware is available.
 
 ## Goal
 
@@ -16,7 +15,6 @@ Add a software mock that feeds synthetic CSC data directly into the existing IPC
 | Mode | How to activate |
 |------|----------------|
 | Real sensor | `pnpm dev` |
-| BLE emulator (bleno) | `BLENO_HCI_DEVICE_ID=1 pnpm emulator` + `pnpm dev` |
 | Software mock | `MOCK_BLE=1 pnpm dev` |
 
 ## Approach
@@ -30,10 +28,8 @@ Exports `startScan`, `stopScan`, `connect`, `disconnect` with the same signature
 - `startScan(onDevice)` — immediately calls `onDevice` with a single fake device:
   `{ id: 'mock-0', name: 'DeskBike-MOCK', address: '00:00:00:00:00:00' }`
 - `stopScan()` — no-op
-- `connect(deviceId, onData, onDisconnect)` — starts a 1000ms interval emitting synthetic CSC packets (same sine/cosine logic as `scripts/emulator.ts`: 15–20 km/h, 65–75 RPM)
 - `disconnect(deviceId)` — clears the interval, calls `onDisconnect`
 
-The `buildPacket()` function is duplicated from the emulator (not imported from `scripts/`) to keep the main process free of emulator dependencies.
 
 ## Change: `src/main/ipc/handlers.ts`
 

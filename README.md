@@ -7,7 +7,7 @@ It shows live speed/cadence data, tracks sessions, and stores history in SQLite.
 
 - Runtime architecture is stable: Electron main/preload/renderer with strict IPC boundaries.
 - BLE central is implemented through a Python `bleak` helper process (`src/helpers/ble_helper.py`).
-- A software BLE mock (`MOCK_BLE=1`) and a hardware BLE emulator (`@abandonware/bleno`) are available for testing.
+- A software BLE mock (`MOCK_BLE=1`) is available for testing.
 - Session history and widget window are implemented and persisted via SQLite + Drizzle.
 
 ## Tech Stack
@@ -32,7 +32,6 @@ docs/
   Architecture.md
   plans/      Historical implementation/design plans with status updates
 scripts/
-  emulator.ts BLE CSC peripheral emulator
 tests/
   Unit tests (parser, helper protocol, DB/session logic)
 ```
@@ -44,7 +43,6 @@ Requirements:
 - Node.js 20+
 - pnpm
 - Python 3 (for local non-packaged BLE helper mode)
-- Optional on Linux for emulator/dongle workflows: BlueZ utilities + sudo for adapter operations
 
 Install dependencies:
 
@@ -57,14 +55,6 @@ Run app:
 ```bash
 pnpm dev          # real BLE helper mode
 pnpm dev:mock     # software BLE mock mode
-pnpm dev:dongle   # helper pinned to hci0 (Linux multi-adapter testing)
-```
-
-Run emulator:
-
-```bash
-pnpm emulator          # default adapter
-pnpm emulator:dongle   # Linux: run on hci1 with sudo helper script
 ```
 
 Tests:

@@ -40,7 +40,6 @@ Renderer Process (React)
 | Frontend | React 18 + Vite (`electron-vite`) | Dashboard + widget UI |
 | Language | TypeScript 5 | Main, preload, renderer, scripts, tests |
 | BLE central | Python 3 + `bleak` | Real scanning/connecting/notifying via helper process |
-| BLE mock peripheral | `@abandonware/bleno` | Optional hardware emulator script |
 | Software mock | In-process TypeScript mock helper | `MOCK_BLE=1` no-hardware workflow |
 | Persistence | SQLite (`better-sqlite3`) | Local event and session storage |
 | ORM/migrations | Drizzle ORM + drizzle-kit | Schema definitions and SQL migrations |
@@ -146,7 +145,6 @@ BLE data handling:
 
 - `pnpm dev`: real BLE helper mode
 - `pnpm dev:mock`: software BLE mode
-- `pnpm dev:dongle`: helper pinned to adapter (`BLEAK_ADAPTER=hci0`)
 
 ### Tests
 
@@ -167,8 +165,7 @@ BLE data handling:
 ## Platform Notes
 
 - Linux:
-  - helper can be pinned to adapter via `BLEAK_ADAPTER`
-  - dongle emulator script uses sudo when needed
+  - no special adapter pinning is required for standard helper usage
 - macOS:
   - packaging enables hardened runtime + entitlements file
 - Windows:

@@ -23,10 +23,6 @@ pnpm test         # Run all tests (Vitest)
 pnpm test:watch   # Tests in watch mode
 pnpm db:generate  # Generate Drizzle migrations from schema changes
 pnpm dev:mock        # Start with software BLE mock (no hardware needed)
-pnpm dev:dongle      # Start app with BLE helper pinned to hci0 (Linux hardware-mock setup)
-pnpm emulator        # Run BLE CSC emulator (default adapter, hci0)
-pnpm emulator:dongle # Run emulator on second USB dongle (hci1, Linux only, auto-sudo)
-pnpm emulator:rebuild-native # Rebuild bleno native module for current Node version
 ```
 
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
@@ -72,8 +68,6 @@ src/
   helpers/
     ble_helper.py  # Python BLE helper process (bleak); JSON lines over stdin/stdout
 requirements.txt   # Python dependencies (bleak)
-scripts/
-  emulator.ts    # Standalone BLE CSC peripheral emulator (@abandonware/bleno)
 tests/
   ble/
     csc-parser.test.ts  # Unit tests for CSC parser (9 tests, including rollover)
@@ -99,7 +93,7 @@ docs/
 
 **Mock-only IPC features** — Add an optional method to `IBleHelper` (e.g. `setMockSpeedKmh?`) so `BleHelper` ignores it automatically. Register a `ble:mock-*` IPC handler in `handlers.ts` that calls `helper.method?.()`. Expose via preload and declare in `env.d.ts`.
 
-**BLE architecture** — BLE central role is handled by `src/helpers/ble_helper.py`, a Python subprocess spawned by the main process (`src/main/ble/helper.ts`) via `child_process.spawn`. Communication uses a JSON lines protocol over stdin/stdout. This approach uses BlueZ D-Bus on Linux, CoreBluetooth on macOS, and WinRT on Windows. The renderer's `IpcBleAdapter` (`src/renderer/src/ble/ipc-adapter.ts`) communicates with the main process via IPC. `@abandonware/bleno` is used only for the emulator peripheral role.
+**BLE architecture** — BLE central role is handled by `src/helpers/ble_helper.py`, a Python subprocess spawned by the main process (`src/main/ble/helper.ts`) via `child_process.spawn`. Communication uses a JSON lines protocol over stdin/stdout. This approach uses BlueZ D-Bus on Linux, CoreBluetooth on macOS, and WinRT on Windows. The renderer's `IpcBleAdapter` (`src/renderer/src/ble/ipc-adapter.ts`) communicates with the main process via IPC.
 
 ## Database
 
@@ -115,35 +109,14 @@ sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT sensor_id, timestamp_utc,
 
 ## BLE testing modes
 
-Three modes for testing BLE, from no hardware to full hardware:
+Two modes for testing BLE:
 
 | Mode | Command | BLE stack tested |
 |------|---------|-----------------|
 | Software mock | `pnpm dev:mock` | No BLE — synthetic packets injected in main process |
-| Hardware mock | `pnpm emulator:dongle` + `pnpm dev:dongle` | Full BLE stack: bleno on dongle (hci1) ↔ bleak on built-in (hci0) |
 | Real sensor | `pnpm dev` | Full BLE stack with actual CSC sensor |
 
 **Software mock (`pnpm dev:mock`):** `MockBleHelper` in main process emits synthetic CSC packets every second. Speed is slider-controlled in the UI (default 17.5 km/h, wheel circumference 2.1 m); cadence varies 65–75 RPM. The mock device appears as `DeskBike-MOCK` in the scan results.
-
-**Hardware mock (emulator on USB dongle):** The emulator (`scripts/emulator.ts`) advertises as `DeskBike-EMU` with CSC service UUID `1816`, simulating 15–20 km/h and 65–75 RPM using sine/cosine waves. On Linux with two adapters, run it on `hci1` (USB dongle) so that the bleak helper can scan on `hci0` (built-in) without conflicts:
-
-```bash
-# Terminal 1 — emulator on USB dongle (hci1)
-pnpm emulator:dongle
-
-# Terminal 2 — app connects via bleak on hci0
-pnpm dev:dongle
-```
-
-`BLENO_HCI_DEVICE_ID=1` tells bleno to use `hci1`. `pnpm emulator:dongle` now auto-escalates with `sudo` for Linux adapter permissions. `BLEAK_ADAPTER=hci0` (via `pnpm dev:dongle`) pins the helper to the built-in adapter. If hci1 still misbehaves, run: `sudo hciconfig hci1 down && sudo hciconfig hci1 up` to reset the adapter, then retry.
-
-**Hardware mock troubleshooting (Linux):**
-- `ERR_DLOPEN_FAILED` or `Cannot find module ... bluetooth_hci_socket.node`: run `pnpm emulator:rebuild-native` after switching Node versions.
-- `Bleno warning: adapter state unauthorized`: use `pnpm emulator:dongle` (auto-sudo) or configure capabilities for your Node binary (see bleno Linux README).
-
-## Native module rebuild gotcha
-
-`package.json` lists `electron-rebuild` in scripts but the actual installed package is `@electron/rebuild` (official successor). The `electron-rebuild` binary still works — it's provided by `@electron/rebuild`. Do not add `electron-rebuild` as a separate dependency.
 
 ## Packaging gotchas
 
@@ -165,7 +138,6 @@ gh run download RUN_ID --name deskbike-linux --dir ~/Downloads/deskbike-linux
 | Language | TypeScript 5 |
 | Frontend | React 18 + Vite (electron-vite 3) |
 | BLE central | Python + bleak (via child process, JSON lines IPC) |
-| BLE peripheral (emulator) | @abandonware/bleno |
 | Database | SQLite via better-sqlite3 |
 | ORM | Drizzle ORM + drizzle-kit |
 | Tests | Vitest |

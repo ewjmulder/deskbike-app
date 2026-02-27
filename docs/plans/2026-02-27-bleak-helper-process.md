@@ -944,16 +944,12 @@ MOCK_BLE=1 pnpm dev
 
 Expected: MockAdapter is used (no helper spawned), scan shows DeskBike-MOCK, connect works.
 
-**Step 3: Test with real hardware (or emulator)**
 
-Start the emulator in a separate terminal:
 ```bash
-pnpm emulator
 ```
 
 In the app:
 1. Click Scan — terminal should show `[BleHelper] stdin: {"cmd":"scan"}` and helper stdout lines with found devices
-2. Click Connect on the emulator device — should connect and show live hex data
 3. Click Disconnect
 
 **Step 4: Commit final state**

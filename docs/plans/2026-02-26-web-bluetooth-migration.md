@@ -805,7 +805,6 @@ Final scripts section:
   "test": "vitest run",
   "test:watch": "vitest",
   "db:generate": "drizzle-kit generate",
-  "emulator": "tsx scripts/emulator.ts"
 }
 ```
 
@@ -841,7 +840,6 @@ git commit -m "chore: remove noble, scanner.ts, connection.ts, old mock and csc-
 
 Remove the block that starts with `**Linux BLE permissions (required for real hardware):**` (added in the previous debugging session — no longer relevant after migration).
 
-Also update the BLE emulator note to reflect that `noble` no longer conflicts (only `bleno` is used now for the emulator peripheral, and `navigator.bluetooth` is used for central — different subsystems, no conflict).
 
 **Step 2: Verify mock mode**
 

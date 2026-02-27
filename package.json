@@ -14,7 +14,6 @@
     "dev": "electron-vite dev",
     "predev:mock": "pnpm run native:rebuild:electron",
     "dev:mock": "MOCK_BLE=1 electron-vite dev",
-    "dev:dongle": "BLEAK_ADAPTER=hci0 electron-vite dev",
     "build": "electron-vite build",
     "build:helper": "tsx scripts/build-ble-helper.ts",
     "preview": "electron-vite preview",
@@ -23,14 +22,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "emulator": "tsx scripts/emulator.ts",
-    "emulator:dongle:raw": "BLENO_HCI_DEVICE_ID=1 tsx scripts/emulator.ts",
-    "emulator:dongle": "bash scripts/run-emulator-dongle.sh",
-    "emulator:rebuild-native": "node scripts/rebuild-bluetooth-hci-socket.mjs",
     "dist": "pnpm build && pnpm build:helper && npx electron-builder --publish never"
   },
   "devDependencies": {
-    "@abandonware/bleno": "^0.6.1",
     "@electron/rebuild": "^4.0.3",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",

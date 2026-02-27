@@ -134,7 +134,6 @@ ipcMain.handle('ble:save-measurement', (_e, data) => {
 
 ## What Stays Unchanged
 
-- `scripts/emulator.ts` + `@abandonware/bleno` — emulator still useful for testing
 - `src/main/db/` — all DB code unchanged
 - All 9 CSC parser tests — pass unchanged (only import path updated)
 - `MOCK_BLE=1 pnpm dev` / `pnpm dev:mock` — mock still works, different implementation
