@@ -31,7 +31,12 @@ export default function App() {
       console.error('[App] createBleAdapter failed:', err)
       setErrorDetail(`createBleAdapter: ${msg}`)
       setStatus('error')
+      return
     }
+    window.deskbike.onBleError((message) => {
+      setErrorDetail(`BLE error: ${message}`)
+      setStatus('error')
+    })
   }, [])
 
   function handleScan(): void {
@@ -44,10 +49,6 @@ export default function App() {
     setDevices([])
     setErrorDetail(null)
     setStatus('scanning')
-    window.deskbike.onBleError((message) => {
-      setErrorDetail(`BLE error: ${message}`)
-      setStatus('error')
-    })
     try {
       adapter.current.startScan((device) => {
         console.log('[App] device found:', device)

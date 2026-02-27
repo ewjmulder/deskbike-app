@@ -39,7 +39,7 @@ class BleManager:
         self._scan_task: asyncio.Task | None = None
         self._connect_task: asyncio.Task | None = None
 
-    def request_connect(self, device_id: str) -> None:
+    def request_connect(self) -> None:
         self._connect_event.set()
 
     def request_disconnect(self) -> None:
@@ -55,7 +55,7 @@ class BleManager:
                 seen.add(device.address)
                 emit({"type": "device", "id": device.address, "name": device.name or device.address})
 
-        async with BleakScanner(on_detection):
+        async with BleakScanner(on_detection, service_uuids=[CSC_SERVICE]):
             await self._connect_event.wait()
         # Scanner context is exited here; adapter is released before connect() proceeds
 
@@ -114,7 +114,7 @@ async def read_commands(manager: BleManager) -> None:
                 emit({"type": "error", "message": "device_id is required"})
                 continue
             if manager._connect_task is None or manager._connect_task.done():
-                manager.request_connect(device_id)
+                manager.request_connect()
                 manager._connect_task = asyncio.create_task(manager.connect(device_id))
         elif cmd.get("cmd") == "disconnect":
             manager.request_disconnect()

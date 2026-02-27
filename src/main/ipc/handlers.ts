@@ -47,6 +47,10 @@ export function registerIpcHandlers(webContents: WebContents, helper: BleHelper)
 
   ipcMain.handle('ble:connect', (_e, deviceId: string) => {
     console.log(`[IPC] ble:connect → ${deviceId}`)
+    // Reject any in-flight connect promise before starting a new one
+    pendingConnectReject?.(new Error('New connect request superseded previous one'))
+    pendingConnectResolve = null
+    pendingConnectReject = null
     return new Promise<void>((resolve, reject) => {
       pendingConnectResolve = resolve
       pendingConnectReject = reject

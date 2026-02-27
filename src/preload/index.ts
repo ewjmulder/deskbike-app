@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('deskbike', {
 
   // Main → Renderer: BLE device found during scan
   onDeviceFound: (cb: (device: { id: string; name: string }) => void) => {
+    ipcRenderer.removeAllListeners('ble:device-found')
     ipcRenderer.on('ble:device-found', (_e, device) => {
       console.log(`[Preload] ble:device-found: ${device.name} (${device.id})`)
       cb(device)
@@ -42,11 +43,13 @@ contextBridge.exposeInMainWorld('deskbike', {
 
   // Main → Renderer: raw CSC packet received
   onData: (cb: (raw: number[]) => void) => {
+    ipcRenderer.removeAllListeners('ble:data')
     ipcRenderer.on('ble:data', (_e, raw) => cb(raw))
   },
 
   // Main → Renderer: device disconnected
   onDisconnected: (cb: () => void) => {
+    ipcRenderer.removeAllListeners('ble:disconnected')
     ipcRenderer.on('ble:disconnected', () => {
       console.log('[Preload] ble:disconnected')
       cb()
@@ -55,6 +58,7 @@ contextBridge.exposeInMainWorld('deskbike', {
 
   // Main → Renderer: BLE error
   onBleError: (cb: (message: string) => void) => {
+    ipcRenderer.removeAllListeners('ble:error')
     ipcRenderer.on('ble:error', (_e, message) => {
       console.warn(`[Preload] ble:error: ${message}`)
       cb(message)

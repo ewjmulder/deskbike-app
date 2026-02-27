@@ -52,8 +52,18 @@ export class BleHelper {
       console.error('[BleHelper] stderr:', data.toString())
     })
 
+    this.process.on('error', (err: NodeJS.ErrnoException) => {
+      const hint = err.code === 'ENOENT'
+        ? ' (is python3 installed and on PATH?)'
+        : ''
+      console.error(`[BleHelper] spawn error:${hint}`, err)
+      this.onEvent?.({ type: 'error', message: `Failed to start BLE helper: ${err.message}${hint}` })
+      this.process = null
+    })
+
     this.process.on('exit', (code) => {
       console.log(`[BleHelper] process exited with code ${code}`)
+      this.onEvent?.({ type: 'error', message: `BLE helper process exited (code ${code})` })
       this.process = null
     })
   }
@@ -65,7 +75,11 @@ export class BleHelper {
     }
     const line = JSON.stringify(cmd) + '\n'
     console.log(`[BleHelper] stdin: ${line.trim()}`)
-    this.process.stdin.write(line)
+    try {
+      this.process.stdin.write(line)
+    } catch (err) {
+      console.error('[BleHelper] failed to write to stdin:', err)
+    }
   }
 
   stop(): void {
