@@ -17,6 +17,19 @@ interface MeasurementData {
   crankTime: number | null
 }
 
+interface SessionRecord {
+  id: string
+  sensorId: string
+  startedAt: string
+  endedAt: string | null
+  durationS: number | null
+  distanceM: number | null
+  avgSpeedKmh: number | null
+  maxSpeedKmh: number | null
+  avgCadenceRpm: number | null
+  maxCadenceRpm: number | null
+}
+
 interface Window {
   deskbike: {
     isMock: boolean
@@ -28,5 +41,9 @@ interface Window {
     onData: (cb: (raw: number[]) => void) => void
     onDisconnected: (cb: () => void) => void
     onBleError: (cb: (message: string) => void) => void
+    mockSetSpeed: (kmh: number) => Promise<void>
+    sessionStart: (sensorId: string, startedAt: string) => Promise<{ sessionId: string }>
+    sessionEnd: (sessionId: string, endedAt: string) => Promise<void>
+    getSessionHistory: (sensorId: string) => Promise<SessionRecord[]>
   }
 }

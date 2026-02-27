@@ -64,4 +64,23 @@ contextBridge.exposeInMainWorld('deskbike', {
       cb(message)
     })
   },
+
+  // Mock-only: set emitted speed in km/h
+  mockSetSpeed: (kmh: number) => {
+    return ipcRenderer.invoke('ble:mock-set-speed', kmh)
+  },
+
+  sessionStart: (sensorId: string, startedAt: string): Promise<{ sessionId: string }> => {
+    console.log(`[Preload] sessionStart sensorId=${sensorId}`)
+    return ipcRenderer.invoke('session:start', { sensorId, startedAt })
+  },
+
+  sessionEnd: (sessionId: string, endedAt: string): Promise<void> => {
+    console.log(`[Preload] sessionEnd sessionId=${sessionId}`)
+    return ipcRenderer.invoke('session:end', { sessionId, endedAt })
+  },
+
+  getSessionHistory: (sensorId: string): Promise<SessionRecord[]> => {
+    return ipcRenderer.invoke('session:get-history', { sensorId })
+  },
 })
