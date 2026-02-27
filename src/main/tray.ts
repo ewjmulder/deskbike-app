@@ -16,7 +16,10 @@ export class TrayManager {
     this.tray = new Tray(icon)
     this.tray.setToolTip('DeskBike')
     this.rebuildMenu()
-    this.tray.on('click', () => this.windowManager.toggleWidget())
+    this.tray.on('click', () => {
+      this.windowManager.toggleWidget()
+      this.rebuildMenu()
+    })
   }
 
   private rebuildMenu(): void {
