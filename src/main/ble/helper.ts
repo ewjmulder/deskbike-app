@@ -15,6 +15,15 @@ export type HelperEvent =
 
 export type HelperEventHandler = (event: HelperEvent) => void
 
+export interface IBleHelper {
+  setEventHandler(handler: HelperEventHandler): void
+  start(): void
+  stop(): void
+  send(cmd: Record<string, unknown>): void
+  /** Mock-only: override the emitted speed. No-op on real hardware. */
+  setMockSpeedKmh?(kmh: number): void
+}
+
 /** Parse one stdout line from the helper process. Returns null if invalid. */
 export function parseHelperLine(line: string): HelperEvent | null {
   const trimmed = line.trim()
@@ -26,7 +35,7 @@ export function parseHelperLine(line: string): HelperEvent | null {
   }
 }
 
-export class BleHelper {
+export class BleHelper implements IBleHelper {
   private process: ChildProcess | null = null
   private onEvent: HelperEventHandler | null = null
 

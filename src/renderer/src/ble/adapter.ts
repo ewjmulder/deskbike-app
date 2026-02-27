@@ -1,6 +1,5 @@
 // src/renderer/src/ble/adapter.ts
 
-import { MockAdapter } from './mock'
 import { IpcBleAdapter } from './ipc-adapter'
 
 export interface DeviceInfo {
@@ -25,12 +24,5 @@ export interface BleAdapter {
 }
 
 export function createBleAdapter(): BleAdapter {
-  const isMock = window.deskbike.isMock
-  console.log(`[BLE] createBleAdapter: isMock=${isMock}`)
-  if (isMock) {
-    console.log('[BLE] using MockAdapter')
-    return new MockAdapter()
-  }
-  console.log('[BLE] using IpcBleAdapter')
   return new IpcBleAdapter()
 }
