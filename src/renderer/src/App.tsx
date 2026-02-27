@@ -84,6 +84,7 @@ export default function App() {
       }, 1000)
     } else {
       if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+      elapsedIntervalRef.current = null
       setElapsedS(0)
     }
     return () => {
