@@ -3,9 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createBleAdapter } from './ble/adapter'
 import type { BleAdapter, DeviceInfo } from './ble/adapter'
-import { parseRawCsc } from './ble/csc-parser'
-import { computeDeltas } from './ble/csc-parser'
-import type { CscRawFields } from './ble/csc-parser'
+import { parseRawCsc, computeDeltas, type CscRawFields } from './ble/csc-parser'
 import { useDevLog } from './useDevLog'
 
 export default function App() {
@@ -63,10 +61,11 @@ export default function App() {
   }, [])
 
   const endActiveSession = useCallback(async () => {
-    if (!sessionIdRef.current) return
+    if (!sessionIdRef.current || sessionIdRef.current === 'pending') return
     const endedAt = new Date().toISOString()
     await window.deskbike.sessionEnd(sessionIdRef.current, endedAt)
     sessionIdRef.current = null
+    inactivityTimerRef.current = null
     setSessionId(null)
     setSessionStartedAt(null)
     setLiveSpeed(null)
@@ -112,8 +111,9 @@ export default function App() {
           const now = Date.now()
           const timestampUtc = new Date(now).toISOString()
 
-          // Start session on first packet
+          // Start session on first packet (sentinel prevents re-entry on concurrent packets)
           if (!sessionIdRef.current) {
+            sessionIdRef.current = 'pending'
             const { sessionId: sid } = await window.deskbike.sessionStart(deviceId, timestampUtc)
             sessionIdRef.current = sid
             setSessionId(sid)
