@@ -8,3 +8,6 @@ __pycache__/
 *.py[cod]
 *.sqlite
 *.sqlite-journal
+dist-helpers/
+*.spec
+build/
