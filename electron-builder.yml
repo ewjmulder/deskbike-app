@@ -8,8 +8,6 @@ directories:
 
 files:
   - out/**/*
-  - node_modules/**/*
-  - "!node_modules/.cache/**"
   - "!**/*.ts"
 
 # Bundle the compiled BLE helper binary into resources/helpers/
