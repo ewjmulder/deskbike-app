@@ -84,4 +84,9 @@ contextBridge.exposeInMainWorld('deskbike', {
     console.log(`[Preload] getSessionHistory sensorId=${sensorId}`)
     return ipcRenderer.invoke('session:get-history', { sensorId })
   },
+
+  getSensors: (): Promise<string[]> => {
+    console.log('[Preload] getSensors')
+    return ipcRenderer.invoke('session:get-sensors')
+  },
 })

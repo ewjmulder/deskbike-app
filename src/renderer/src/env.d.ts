@@ -45,5 +45,6 @@ interface Window {
     sessionStart: (sensorId: string, startedAt: string) => Promise<{ sessionId: string }>
     sessionEnd: (sessionId: string, endedAt: string) => Promise<void>
     getSessionHistory: (sensorId: string) => Promise<SessionRecord[]>
+    getSensors: () => Promise<string[]>
   }
 }

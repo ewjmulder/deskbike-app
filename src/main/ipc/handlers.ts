@@ -1,7 +1,7 @@
 // src/main/ipc/handlers.ts
 
 import { ipcMain, WebContents } from 'electron'
-import { insertMeasurement, InsertMeasurementInput, startSession, endSession, getSessionHistory } from '../db/queries'
+import { insertMeasurement, InsertMeasurementInput, startSession, endSession, getSessionHistory, getSensorsWithSessions } from '../db/queries'
 import type { IBleHelper } from '../ble/helper'
 
 export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper): void {
@@ -86,5 +86,10 @@ export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper
   ipcMain.handle('session:get-history', (_e, { sensorId }: { sensorId: string }) => {
     console.log(`[IPC] session:get-history sensorId=${sensorId}`)
     return getSessionHistory(sensorId)
+  })
+
+  ipcMain.handle('session:get-sensors', () => {
+    console.log('[IPC] session:get-sensors')
+    return getSensorsWithSessions()
   })
 }
