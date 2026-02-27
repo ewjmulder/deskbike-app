@@ -36,6 +36,9 @@ app.whenReady().then(() => {
       windowManager.createDashboard()
     }
   })
+}).catch((err) => {
+  console.error('[Main] fatal startup error:', err)
+  app.quit()
 })
 
 app.on('window-all-closed', () => {
