@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "emulator": "tsx scripts/emulator.ts"
+    "emulator": "tsx scripts/emulator.ts",
+    "dist": "pnpm build && pnpm build:helper && electron-builder"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
@@ -24,6 +25,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "drizzle-kit": "^0.28.0",
     "electron": "^33.4.0",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^3.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

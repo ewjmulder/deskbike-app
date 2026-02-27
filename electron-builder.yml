@@ -1,0 +1,38 @@
+appId: com.bytecraft.deskbike
+productName: DeskBike
+copyright: "Copyright © 2026 Bytecraft Digital"
+
+directories:
+  output: release
+  buildResources: build-resources
+
+files:
+  - out/**/*
+  - node_modules/**/*
+  - "!node_modules/.cache/**"
+  - "!**/*.ts"
+
+# Bundle the compiled BLE helper binary into resources/helpers/
+extraResources:
+  - from: dist-helpers/
+    to: helpers/
+    filter:
+      - "ble_helper"
+      - "ble_helper.exe"
+
+linux:
+  target:
+    - target: AppImage
+    - target: deb
+  category: Utility
+
+mac:
+  target:
+    - target: dmg
+  hardenedRuntime: true
+  entitlements: build-resources/entitlements.mac.plist
+  entitlementsInherit: build-resources/entitlements.mac.plist
+
+win:
+  target:
+    - target: nsis
