@@ -5,7 +5,7 @@ const START = '2026-01-01T10:00:00.000Z'
 const END_30MIN = '2026-01-01T10:30:00.000Z'
 
 describe('computeSessionStats', () => {
-  it('returns zero duration and all nulls for empty measurements', () => {
+  it('returns correct duration and all nulls for empty measurements', () => {
     const stats = computeSessionStats([], START, END_30MIN)
     expect(stats.durationS).toBe(1800)
     expect(stats.distanceM).toBeNull()
@@ -57,7 +57,8 @@ describe('computeSessionStats', () => {
     const stats = computeSessionStats([slow, fast], START, END_30MIN)
     expect(stats.distanceM).toBeCloseTo(3 * 2.105, 3)
     expect(stats.maxSpeedKmh).toBeCloseTo(15.156, 2)
-    expect(stats.avgSpeedKmh).toBeCloseTo((3.789 + 15.156) / 2, 1)
+    // avg = (3 * 2.105 m) / (3072 ticks / 1024 s) * 3.6 = 6.315 / 3.0 * 3.6 = 7.578 km/h
+    expect(stats.avgSpeedKmh).toBeCloseTo(7.578, 2)
   })
 
   it('ignores packets with zero revsDiff or zero timeDiff', () => {

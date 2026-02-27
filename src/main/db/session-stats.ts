@@ -28,6 +28,7 @@ export function computeSessionStats(
   const speeds: number[] = []
   const cadences: number[] = []
   let totalDistanceM = 0
+  let totalWheelTimeTicks = 0
   let hasAnyWheelData = false
 
   for (const m of measurements) {
@@ -39,6 +40,7 @@ export function computeSessionStats(
       hasAnyWheelData = true
       const distM = m.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
       totalDistanceM += distM
+      totalWheelTimeTicks += m.wheelTimeDiff
       const timeS = m.wheelTimeDiff / 1024
       speeds.push((distM / timeS) * 3.6)
     }
@@ -57,7 +59,7 @@ export function computeSessionStats(
   return {
     durationS,
     distanceM: hasAnyWheelData ? totalDistanceM : null,
-    avgSpeedKmh: speeds.length > 0 ? avg(speeds) : null,
+    avgSpeedKmh: totalWheelTimeTicks > 0 ? (totalDistanceM / (totalWheelTimeTicks / 1024)) * 3.6 : null,
     maxSpeedKmh: speeds.length > 0 ? Math.max(...speeds) : null,
     avgCadenceRpm: cadences.length > 0 ? avg(cadences) : null,
     maxCadenceRpm: cadences.length > 0 ? Math.max(...cadences) : null,
