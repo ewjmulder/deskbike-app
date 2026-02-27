@@ -1,5 +1,10 @@
 # Web Bluetooth Migration Implementation Plan
 
+> **Status update (2026-02-27):** Superseded implementation plan.
+> The Web Bluetooth approach was replaced by the Python bleak helper process approach.
+> Current source of truth: `docs/Architecture.md` and `docs/plans/2026-02-27-bleak-helper-process.md`.
+
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Replace `@stoprocent/noble` (main-process BLE) with Electron's Web Bluetooth API (renderer-process BLE), eliminating the Linux `setcap` requirement for all users.

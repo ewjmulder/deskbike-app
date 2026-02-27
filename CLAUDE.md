@@ -2,6 +2,12 @@
 
 Cross-platform desktop app (Windows, macOS, Linux) for desk bike CSC (Cycling Speed & Cadence) BLE sensor data. Shows real-time statistics and challenges for people cycling at their desk.
 
+## Documentation status
+
+- Last updated: 2026-02-27
+- This file reflects the current implementation.
+- Historical plans live in `docs/plans/` and include status banners.
+
 ## Language convention
 
 - All code and documentation: **English**
@@ -16,8 +22,11 @@ pnpm build        # Build for production
 pnpm test         # Run all tests (Vitest)
 pnpm test:watch   # Tests in watch mode
 pnpm db:generate  # Generate Drizzle migrations from schema changes
-pnpm emulator     # Run BLE CSC emulator (needs separate BT adapter on Linux)
-MOCK_BLE=1 pnpm dev  # Start with software BLE mock (no hardware needed)
+pnpm dev:mock        # Start with software BLE mock (no hardware needed)
+pnpm dev:dongle      # Start app with BLE helper pinned to hci0 (Linux hardware-mock setup)
+pnpm emulator        # Run BLE CSC emulator (default adapter, hci0)
+pnpm emulator:dongle # Run emulator on second USB dongle (hci1, Linux only, auto-sudo)
+pnpm emulator:rebuild-native # Rebuild bleno native module for current Node version
 ```
 
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
@@ -36,26 +45,30 @@ node node_modules/electron/install.js
 src/
   main/          # Electron main process (Node.js) — SQLite, IPC, BLE helper
     ble/
-      helper.ts        # Spawns ble_helper.py, speaks JSON lines protocol, emits events
+      helper.ts        # IBleHelper interface + BleHelper: spawns ble_helper.py, JSON lines protocol
+      mock-helper.ts   # MockBleHelper: drop-in for BleHelper when MOCK_BLE=1; emits synthetic CSC packets
     db/
       schema.ts        # Drizzle ORM schema (all 5 tables)
       index.ts         # DB init: opens SQLite, runs migrations
       queries.ts       # insertMeasurement, getRecentMeasurements
       migrations/      # Auto-generated SQL — never edit manually
     ipc/
-      handlers.ts      # IPC handler registration (ble:select-device, ble:save-measurement)
+      handlers.ts      # IPC handlers: ble:scan-start, ble:connect, ble:disconnect, ble:save-measurement, ble:mock-set-speed
     index.ts           # Electron entry: initDb → registerIpcHandlers → createWindow
   preload/
     index.ts     # contextBridge: exposes window.deskbike to renderer
   renderer/      # React app (Vite, Chromium)
     src/
-      App.tsx          # Diagnostic UI — scan, connect, live hex display
+      App.tsx          # Tab shell + widget routing (?view=widget)
+      DiagnosticTab.tsx# Live BLE diagnostics + session lifecycle
+      HistoryTab.tsx   # Session history per sensor
       env.d.ts         # window.deskbike type declarations
       ble/
         adapter.ts       # BleAdapter interface + createBleAdapter() factory
-        ipc.ts           # IpcBleAdapter: talks to main process via IPC (real hardware)
-        mock.ts          # MockAdapter: pure JS timer (MOCK_BLE=1)
+        ipc-adapter.ts   # IpcBleAdapter: talks to main process via IPC (real hardware)
         csc-parser.ts    # parseRawCsc + computeDeltas (Uint8Array/DataView)
+      components/widget/
+        WidgetView.tsx   # Floating compact metrics UI
   helpers/
     ble_helper.py  # Python BLE helper process (bleak); JSON lines over stdin/stdout
 requirements.txt   # Python dependencies (bleak)
@@ -64,7 +77,10 @@ scripts/
 tests/
   ble/
     csc-parser.test.ts  # Unit tests for CSC parser (9 tests, including rollover)
-    mock.test.ts        # Unit tests for MockAdapter (4 tests)
+    ipc-adapter.test.ts # Unit tests for renderer IPC BLE adapter
+  main/
+    ble/helper.test.ts  # Unit tests for helper line protocol parsing
+    db/session-stats.test.ts
 docs/
   Architecture.md       # Full architecture reference
   plans/                # Implementation plans (historical)
@@ -81,7 +97,9 @@ docs/
 
 **IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. BLE is managed in the main process via the helper process; the renderer communicates with it through IPC. DB persistence also goes through IPC.
 
-**BLE architecture** — BLE central role is handled by `src/helpers/ble_helper.py`, a Python subprocess spawned by the main process (`src/main/ble/helper.ts`) via `child_process.spawn`. Communication uses a JSON lines protocol over stdin/stdout. This approach uses BlueZ D-Bus on Linux, CoreBluetooth on macOS, and WinRT on Windows — no `setcap` or special permissions required. The renderer's `IpcBleAdapter` (`src/renderer/src/ble/ipc.ts`) communicates with the main process via IPC. `@abandonware/bleno` is used only for the emulator peripheral role.
+**Mock-only IPC features** — Add an optional method to `IBleHelper` (e.g. `setMockSpeedKmh?`) so `BleHelper` ignores it automatically. Register a `ble:mock-*` IPC handler in `handlers.ts` that calls `helper.method?.()`. Expose via preload and declare in `env.d.ts`.
+
+**BLE architecture** — BLE central role is handled by `src/helpers/ble_helper.py`, a Python subprocess spawned by the main process (`src/main/ble/helper.ts`) via `child_process.spawn`. Communication uses a JSON lines protocol over stdin/stdout. This approach uses BlueZ D-Bus on Linux, CoreBluetooth on macOS, and WinRT on Windows. The renderer's `IpcBleAdapter` (`src/renderer/src/ble/ipc-adapter.ts`) communicates with the main process via IPC. `@abandonware/bleno` is used only for the emulator peripheral role.
 
 ## Database
 
@@ -95,13 +113,33 @@ sqlite3 ~/.config/deskbike-app/deskbike.sqlite ".tables"
 sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT sensor_id, timestamp_utc, wheel_revs_diff, wheel_time_diff FROM measurements LIMIT 10;"
 ```
 
-## BLE emulator
+## BLE testing modes
 
-The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUID `1816`. It simulates 15–20 km/h and 65–75 RPM using sine/cosine waves.
+Three modes for testing BLE, from no hardware to full hardware:
 
-**Linux:** No adapter conflicts — the bleak helper process and `bleno` (peripheral, emulator) use different subsystems. The emulator can run on the same machine as the app.
+| Mode | Command | BLE stack tested |
+|------|---------|-----------------|
+| Software mock | `pnpm dev:mock` | No BLE — synthetic packets injected in main process |
+| Hardware mock | `pnpm emulator:dongle` + `pnpm dev:dongle` | Full BLE stack: bleno on dongle (hci1) ↔ bleak on built-in (hci0) |
+| Real sensor | `pnpm dev` | Full BLE stack with actual CSC sensor |
 
-**Software mock (no hardware):** `MOCK_BLE=1 pnpm dev` starts the app with a built-in mock that emits synthetic CSC packets every second (15–20 km/h, 65–75 RPM). The mock device appears as `DeskBike-MOCK` in the scan results.
+**Software mock (`pnpm dev:mock`):** `MockBleHelper` in main process emits synthetic CSC packets every second. Speed is slider-controlled in the UI (default 17.5 km/h, wheel circumference 2.1 m); cadence varies 65–75 RPM. The mock device appears as `DeskBike-MOCK` in the scan results.
+
+**Hardware mock (emulator on USB dongle):** The emulator (`scripts/emulator.ts`) advertises as `DeskBike-EMU` with CSC service UUID `1816`, simulating 15–20 km/h and 65–75 RPM using sine/cosine waves. On Linux with two adapters, run it on `hci1` (USB dongle) so that the bleak helper can scan on `hci0` (built-in) without conflicts:
+
+```bash
+# Terminal 1 — emulator on USB dongle (hci1)
+pnpm emulator:dongle
+
+# Terminal 2 — app connects via bleak on hci0
+pnpm dev:dongle
+```
+
+`BLENO_HCI_DEVICE_ID=1` tells bleno to use `hci1`. `pnpm emulator:dongle` now auto-escalates with `sudo` for Linux adapter permissions. `BLEAK_ADAPTER=hci0` (via `pnpm dev:dongle`) pins the helper to the built-in adapter. If hci1 still misbehaves, run: `sudo hciconfig hci1 down && sudo hciconfig hci1 up` to reset the adapter, then retry.
+
+**Hardware mock troubleshooting (Linux):**
+- `ERR_DLOPEN_FAILED` or `Cannot find module ... bluetooth_hci_socket.node`: run `pnpm emulator:rebuild-native` after switching Node versions.
+- `Bleno warning: adapter state unauthorized`: use `pnpm emulator:dongle` (auto-sudo) or configure capabilities for your Node binary (see bleno Linux README).
 
 ## Native module rebuild gotcha
 

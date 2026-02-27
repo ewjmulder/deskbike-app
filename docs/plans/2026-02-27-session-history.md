@@ -1,5 +1,10 @@
 # Session History Implementation Plan
 
+> **Status update (2026-02-27):** Implemented.
+> Session recording and history views are live.
+> Current source of truth: runtime code and tests in `tests/main/db/session-stats.test.ts`.
+
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Automatically record cycling sessions per sensor, compute statistics when a session ends, and display session history after connecting.

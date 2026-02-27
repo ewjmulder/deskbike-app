@@ -1,5 +1,10 @@
 # Design: Migrate BLE from noble to Electron Web Bluetooth
 
+> **Status update (2026-02-27):** Superseded plan.
+> This Web Bluetooth migration path was abandoned and replaced by the Python bleak helper architecture.
+> Current source of truth: `docs/Architecture.md` and `docs/plans/2026-02-27-bleak-helper-process.md`.
+
+
 **Date:** 2026-02-26
 **Status:** Approved
 

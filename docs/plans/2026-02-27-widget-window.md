@@ -1,5 +1,10 @@
 # Widget Window Implementation Plan
 
+> **Status update (2026-02-27):** Implemented.
+> Widget window, tray controls, and related IPC/settings wiring are present in production code.
+> Current source of truth: runtime code in `src/main/` and `src/renderer/src/components/widget/`.
+
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add a separate floating widget window that shows live cycling metrics (speed, cadence, distance, duration) always-on-top of other apps, alongside the existing dashboard window.

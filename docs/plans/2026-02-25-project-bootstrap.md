@@ -1,5 +1,10 @@
 # Project Bootstrap + BLE Data Pipeline
 
+> **Status update (2026-02-27):** Historical bootstrap plan.
+> It documents the original implementation path and includes noble-era content that is no longer current.
+> Current source of truth: `docs/Architecture.md` and runtime code in `src/`.
+
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Bootstrap the Electron + TypeScript project and implement the full pipeline: CSC BLE sensor (real or emulated) → CSC parser → SQLite `measurements` table, with a minimal React UI to verify live data is flowing.

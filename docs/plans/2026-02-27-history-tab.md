@@ -1,5 +1,10 @@
 # History Tab Implementation Plan
 
+> **Status update (2026-02-27):** Implemented.
+> History tab is live in the dashboard and connected to session APIs.
+> Current source of truth: runtime code in `src/renderer/src/HistoryTab.tsx` and `src/main/ipc/handlers.ts`.
+
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add a "History" tab alongside the existing "Live" tab, with a standalone session database viewer (sensor dropdown → session dropdown → detail card).

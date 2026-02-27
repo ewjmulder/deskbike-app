@@ -1,5 +1,10 @@
 # Design: Software BLE Mock (`MOCK_BLE=1`)
 
+> **Status update (2026-02-27):** Historical design notes.
+> Intent is still relevant (software mock mode exists), but file paths and module names changed in final implementation.
+> Current source of truth: `docs/Architecture.md` and `src/main/ble/mock-helper.ts`.
+
+
 ## Problem
 
 On Linux, `noble` (BLE central) and `bleno` (BLE peripheral) cannot share the same Bluetooth adapter. Running both the app and the emulator on one machine is therefore not possible without a second USB BT dongle. During development, this blocks UI work when no hardware is available.

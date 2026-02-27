@@ -1,5 +1,10 @@
 # Session History Design
 
+> **Status update (2026-02-27):** Implemented design.
+> Session lifecycle and aggregation behavior described here are active in the codebase.
+> Current source of truth: `src/renderer/src/DiagnosticTab.tsx`, `src/main/db/queries.ts`, `src/main/db/session-stats.ts`.
+
+
 **Date:** 2026-02-27
 **Status:** Approved
 

@@ -1,5 +1,10 @@
 # Widget Window Design
 
+> **Status update (2026-02-27):** Implemented design.
+> Widget and window manager architecture are active and persisted via settings.
+> Current source of truth: `src/main/windows.ts`, `src/main/tray.ts`, `src/renderer/src/components/widget/WidgetView.tsx`.
+
+
 **Date:** 2026-02-27
 **Status:** Approved
 
