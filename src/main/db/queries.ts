@@ -1,9 +1,10 @@
 // src/main/db/queries.ts
 
-import { eq, desc } from 'drizzle-orm'
+import { eq, desc, and, gte, lte, isNotNull } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { getDb } from './index'
-import { measurements } from './schema'
+import { measurements, sessions } from './schema'
+import { computeSessionStats } from './session-stats'
 
 export interface InsertMeasurementInput {
   sensorId: string
@@ -80,6 +81,63 @@ export function getRecentMeasurements(sensorId: string, limit = 100) {
     .from(measurements)
     .where(eq(measurements.sensorId, sensorId))
     .orderBy(desc(measurements.timestampUtc))
+    .limit(limit)
+    .all()
+}
+
+export function startSession(sensorId: string, startedAt: string): string {
+  const db = getDb()
+  const id = randomUUID()
+  db.insert(sessions).values({ id, sensorId, startedAt }).run()
+  return id
+}
+
+export function endSession(sessionId: string, endedAt: string): void {
+  const db = getDb()
+
+  const session = db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .all()[0]
+
+  if (!session) return
+
+  const sessionMeasurements = db
+    .select()
+    .from(measurements)
+    .where(
+      and(
+        eq(measurements.sensorId, session.sensorId),
+        gte(measurements.timestampUtc, session.startedAt),
+        lte(measurements.timestampUtc, endedAt)
+      )
+    )
+    .all()
+
+  const stats = computeSessionStats(sessionMeasurements, session.startedAt, endedAt)
+
+  db.update(sessions)
+    .set({
+      endedAt,
+      durationS: Math.round(stats.durationS),
+      distanceM: stats.distanceM,
+      avgSpeedKmh: stats.avgSpeedKmh,
+      maxSpeedKmh: stats.maxSpeedKmh,
+      avgCadenceRpm: stats.avgCadenceRpm,
+      maxCadenceRpm: stats.maxCadenceRpm,
+    })
+    .where(eq(sessions.id, sessionId))
+    .run()
+}
+
+export function getSessionHistory(sensorId: string, limit = 20) {
+  const db = getDb()
+  return db
+    .select()
+    .from(sessions)
+    .where(and(eq(sessions.sensorId, sensorId), isNotNull(sessions.endedAt)))
+    .orderBy(desc(sessions.startedAt))
     .limit(limit)
     .all()
 }
