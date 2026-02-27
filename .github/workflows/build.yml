@@ -40,10 +40,7 @@ jobs:
           uv pip install -r requirements.txt
 
       - name: Install Node dependencies
-        run: pnpm install
-
-      - name: Rebuild native modules for Electron
-        run: pnpm electron-rebuild -f -w better-sqlite3
+        run: pnpm install --ignore-scripts
 
       - name: Build BLE helper binary
         run: pnpm build:helper
