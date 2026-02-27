@@ -3,7 +3,7 @@
 import { eq, desc, and, gte, lte, isNotNull } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { getDb } from './index'
-import { measurements, sessions } from './schema'
+import { measurements, sessions, settings } from './schema'
 import { computeSessionStats } from './session-stats'
 
 export interface InsertMeasurementInput {
@@ -140,4 +140,19 @@ export function getSessionHistory(sensorId: string, limit = 20) {
     .orderBy(desc(sessions.startedAt))
     .limit(limit)
     .all()
+}
+
+export function getSetting<T>(key: string): T | null {
+  const db = getDb()
+  const row = db.select().from(settings).where(eq(settings.key, key)).all()[0]
+  if (!row) return null
+  return JSON.parse(row.value) as T
+}
+
+export function setSetting<T>(key: string, value: T): void {
+  const db = getDb()
+  db.insert(settings)
+    .values({ key, value: JSON.stringify(value) })
+    .onConflictDoUpdate({ target: settings.key, set: { value: JSON.stringify(value) } })
+    .run()
 }
