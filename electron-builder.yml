@@ -17,6 +17,8 @@ extraResources:
     filter:
       - "ble_helper"
       - "ble_helper.exe"
+  - from: src/main/db/migrations/
+    to: migrations/
 
 linux:
   target:
