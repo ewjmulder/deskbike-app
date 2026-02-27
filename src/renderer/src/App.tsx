@@ -6,6 +6,21 @@ import type { BleAdapter, DeviceInfo } from './ble/adapter'
 import { parseRawCsc, computeDeltas, type CscRawFields } from './ble/csc-parser'
 import { useDevLog } from './useDevLog'
 
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function formatDistance(meters: number): string {
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(1)} km`
+    : `${Math.round(meters)} m`
+}
+
 export default function App() {
   const logs = useDevLog()
   const logEndRef = useRef<HTMLDivElement>(null)
@@ -24,6 +39,8 @@ export default function App() {
   const [liveSpeed, setLiveSpeed] = useState<number | null>(null)
   const [liveCadence, setLiveCadence] = useState<number | null>(null)
   const [sessionDistance, setSessionDistance] = useState(0)
+  const [elapsedS, setElapsedS] = useState(0)
+  const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const sessionIdRef = useRef<string | null>(null)
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -59,6 +76,20 @@ export default function App() {
       setStatus('error')
     })
   }, [])
+
+  useEffect(() => {
+    if (sessionId && sessionStartedAt) {
+      elapsedIntervalRef.current = setInterval(() => {
+        setElapsedS(Math.floor((Date.now() - new Date(sessionStartedAt).getTime()) / 1000))
+      }, 1000)
+    } else {
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+      setElapsedS(0)
+    }
+    return () => {
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+    }
+  }, [sessionId, sessionStartedAt])
 
   const endActiveSession = useCallback(async () => {
     if (!sessionIdRef.current || sessionIdRef.current === 'pending') return
@@ -239,6 +270,79 @@ export default function App() {
           <div>
             <h3>Live data (packet #{packetCount})</h3>
             <p>Raw bytes: <code>{lastHex}</code></p>
+          </div>
+        )}
+
+        {/* Active session bar */}
+        {sessionId && (
+          <div style={{
+            marginTop: 16,
+            padding: '10px 14px',
+            background: '#1a2a1a',
+            border: '1px solid #3a5a3a',
+            borderRadius: 6,
+            display: 'flex',
+            gap: 24,
+            alignItems: 'center',
+          }}>
+            <span style={{ color: '#4f4', fontWeight: 'bold', fontSize: 12 }}>● ACTIVE SESSION</span>
+            <span>{formatDuration(elapsedS)}</span>
+            {sessionDistance > 0 && <span>{formatDistance(sessionDistance)}</span>}
+            {liveSpeed !== null && <span>{liveSpeed.toFixed(1)} km/h</span>}
+            {liveCadence !== null && <span>{Math.round(liveCadence)} RPM</span>}
+          </div>
+        )}
+
+        {/* Session history */}
+        {sessionHistory.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h3 style={{ marginBottom: 6 }}>
+              Session history — {connectedDeviceId}
+            </h3>
+            <table style={{ borderCollapse: 'collapse', fontSize: 12, width: '100%' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #444' }}>
+                  <th style={{ textAlign: 'left', padding: '4px 10px 4px 0' }}>Date</th>
+                  <th style={{ textAlign: 'right', padding: '4px 10px' }}>Duration</th>
+                  {sessionHistory.some((s) => s.distanceM !== null) && (
+                    <th style={{ textAlign: 'right', padding: '4px 10px' }}>Distance</th>
+                  )}
+                  {sessionHistory.some((s) => s.avgSpeedKmh !== null) && (
+                    <th style={{ textAlign: 'right', padding: '4px 10px' }}>Avg speed</th>
+                  )}
+                  {sessionHistory.some((s) => s.avgCadenceRpm !== null) && (
+                    <th style={{ textAlign: 'right', padding: '4px 10px' }}>Avg cadence</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {sessionHistory.map((s) => (
+                  <tr key={s.id} style={{ borderBottom: '1px solid #222' }}>
+                    <td style={{ padding: '4px 10px 4px 0' }}>
+                      {new Date(s.startedAt).toLocaleString()}
+                    </td>
+                    <td style={{ textAlign: 'right', padding: '4px 10px' }}>
+                      {s.durationS !== null ? formatDuration(s.durationS) : '—'}
+                    </td>
+                    {sessionHistory.some((x) => x.distanceM !== null) && (
+                      <td style={{ textAlign: 'right', padding: '4px 10px' }}>
+                        {s.distanceM !== null ? formatDistance(s.distanceM) : '—'}
+                      </td>
+                    )}
+                    {sessionHistory.some((x) => x.avgSpeedKmh !== null) && (
+                      <td style={{ textAlign: 'right', padding: '4px 10px' }}>
+                        {s.avgSpeedKmh !== null ? `${s.avgSpeedKmh.toFixed(1)} km/h` : '—'}
+                      </td>
+                    )}
+                    {sessionHistory.some((x) => x.avgCadenceRpm !== null) && (
+                      <td style={{ textAlign: 'right', padding: '4px 10px' }}>
+                        {s.avgCadenceRpm !== null ? `${Math.round(s.avgCadenceRpm)} RPM` : '—'}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
