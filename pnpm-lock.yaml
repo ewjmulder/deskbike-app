@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@abandonware/bleno':
-        specifier: ^0.6.1
-        version: 0.6.2(encoding@0.1.13)
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.10.0
@@ -24,6 +21,9 @@ importers:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
+      '@abandonware/bleno':
+        specifier: ^0.6.1
+        version: 0.6.2(encoding@0.1.13)
       '@electron/rebuild':
         specifier: ^4.0.3
         version: 4.0.3
