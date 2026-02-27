@@ -41,8 +41,6 @@ jobs:
 
       - name: Install Node dependencies
         run: pnpm install
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
       - name: Build BLE helper binary
         run: pnpm build:helper
