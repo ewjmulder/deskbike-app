@@ -29,10 +29,13 @@ export default function DiagnosticTab() {
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const sessionIdRef = useRef<string | null>(null)
+  const sessionStartPromiseRef = useRef<Promise<string> | null>(null)
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevCscRef = useRef<CscRawFields | null>(null)
   const prevTimestampRef = useRef<number | null>(null)
   const sessionDistanceRef = useRef(0)
+  const connectedDeviceIdRef = useRef<string | null>(null)
+  const isUnmountingRef = useRef(false)
 
   const INACTIVITY_MS = 2 * 60 * 1000
   const WHEEL_CIRCUMFERENCE_M = 2.105
@@ -78,15 +81,35 @@ export default function DiagnosticTab() {
     }
   }, [sessionId, sessionStartedAt])
 
-  const endActiveSession = useCallback(async () => {
-    if (!sessionIdRef.current || sessionIdRef.current === 'pending') return
+  const endActiveSession = useCallback(async (
+    { resetUi = true, refreshHistory = true }: { resetUi?: boolean; refreshHistory?: boolean } = {}
+  ) => {
+    let activeSessionId = sessionIdRef.current
+    if (activeSessionId === 'pending' && sessionStartPromiseRef.current) {
+      try {
+        activeSessionId = await sessionStartPromiseRef.current
+      } catch {
+        activeSessionId = null
+      }
+    }
+    if (!activeSessionId || activeSessionId === 'pending') return
+
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current)
       inactivityTimerRef.current = null
     }
+
     const endedAt = new Date().toISOString()
-    await window.deskbike.sessionEnd(sessionIdRef.current, endedAt)
+    await window.deskbike.sessionEnd(activeSessionId, endedAt)
     sessionIdRef.current = null
+    sessionStartPromiseRef.current = null
+
+    if (refreshHistory && connectedDeviceIdRef.current) {
+      const history = await window.deskbike.getSessionHistory(connectedDeviceIdRef.current)
+      if (!isUnmountingRef.current) setSessionHistory(history)
+    }
+
+    if (!resetUi || isUnmountingRef.current) return
     setSessionId(null)
     setSessionStartedAt(null)
     setLiveSpeed(null)
@@ -96,6 +119,29 @@ export default function DiagnosticTab() {
     prevCscRef.current = null
     prevTimestampRef.current = null
   }, [])
+
+  useEffect(() => {
+    return () => {
+      isUnmountingRef.current = true
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current)
+        inactivityTimerRef.current = null
+      }
+
+      void (async () => {
+        try {
+          await endActiveSession({ resetUi: false, refreshHistory: false })
+        } catch (err) {
+          console.error('[DiagnosticTab] unmount session end failed:', err)
+        }
+        try {
+          await adapter.current?.disconnect()
+        } catch (err) {
+          console.error('[DiagnosticTab] unmount disconnect failed:', err)
+        }
+      })()
+    }
+  }, [endActiveSession])
 
   function handleScan(): void {
     console.log('[DiagnosticTab] handleScan')
@@ -135,10 +181,27 @@ export default function DiagnosticTab() {
           // Start session on first packet (sentinel prevents re-entry on concurrent packets)
           if (!sessionIdRef.current) {
             sessionIdRef.current = 'pending'
-            const { sessionId: sid } = await window.deskbike.sessionStart(deviceId, timestampUtc)
-            sessionIdRef.current = sid
-            setSessionId(sid)
-            setSessionStartedAt(timestampUtc)
+            const startPromise = window.deskbike
+              .sessionStart(deviceId, timestampUtc)
+              .then(({ sessionId: sid }) => {
+                sessionIdRef.current = sid
+                if (!isUnmountingRef.current) {
+                  setSessionId(sid)
+                  setSessionStartedAt(timestampUtc)
+                }
+                return sid
+              })
+              .catch((err) => {
+                sessionIdRef.current = null
+                throw err
+              })
+              .finally(() => {
+                if (sessionStartPromiseRef.current === startPromise) {
+                  sessionStartPromiseRef.current = null
+                }
+              })
+            sessionStartPromiseRef.current = startPromise
+            await startPromise
           }
 
           // Reset inactivity timer
@@ -192,11 +255,13 @@ export default function DiagnosticTab() {
           await endActiveSession()
           setStatus('disconnected')
           setConnectedDeviceId(null)
+          connectedDeviceIdRef.current = null
         }
       )
       console.log('[DiagnosticTab] connected successfully')
       setStatus('connected')
       setConnectedDeviceId(deviceId)
+      connectedDeviceIdRef.current = deviceId
       const history = await window.deskbike.getSessionHistory(deviceId)
       setSessionHistory(history)
     } catch (err) {
@@ -218,6 +283,7 @@ export default function DiagnosticTab() {
     await adapter.current.disconnect()
     setStatus('disconnected')
     setConnectedDeviceId(null)
+    connectedDeviceIdRef.current = null
   }
 
   function handleMockSpeedChange(kmh: number): void {

@@ -57,6 +57,13 @@ export default function WidgetView(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
+    const prevHtmlOverflow = document.documentElement.style.overflow
+    const prevBodyMargin = document.body.style.margin
+    const prevBodyOverflow = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.margin = '0'
+    document.body.style.overflow = 'hidden'
+
     window.deskbike.onData((raw) => {
       const now = Date.now()
       const parsed = parseRawCsc(new Uint8Array(raw))
@@ -94,7 +101,12 @@ export default function WidgetView(): React.JSX.Element {
     })
 
     window.deskbike.onDisconnected(reset)
-    return () => { if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current) }
+    return () => {
+      if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current)
+      document.documentElement.style.overflow = prevHtmlOverflow
+      document.body.style.margin = prevBodyMargin
+      document.body.style.overflow = prevBodyOverflow
+    }
   }, [startElapsed, reset])
 
   return (
@@ -104,6 +116,7 @@ export default function WidgetView(): React.JSX.Element {
       fontFamily: 'monospace', userSelect: 'none',
       WebkitAppRegion: 'drag',
       display: 'flex', flexDirection: 'column',
+      overflow: 'hidden',
       padding: '10px 14px', boxSizing: 'border-box',
       borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)',
     } as React.CSSProperties}>

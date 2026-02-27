@@ -18,18 +18,55 @@ export default function HistoryTab() {
   const [selectedSession, setSelectedSession] = useState<SessionRecord | null>(null)
 
   useEffect(() => {
-    window.deskbike.getSensors().then((list) => {
+    let mounted = true
+    const refreshSensors = async () => {
+      const list = await window.deskbike.getSensors()
+      if (!mounted) return
       setSensors(list)
-      if (list.length > 0) setSelectedSensor(list[0])
-    })
+      setSelectedSensor((current) => {
+        if (current && list.includes(current)) return current
+        return list[0] ?? ''
+      })
+    }
+
+    void refreshSensors()
+    const interval = setInterval(() => {
+      void refreshSensors()
+    }, 1500)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
   }, [])
 
   useEffect(() => {
-    if (!selectedSensor) return
-    window.deskbike.getSessionHistory(selectedSensor).then((history) => {
-      setSessions(history)
+    if (!selectedSensor) {
+      setSessions([])
       setSelectedSession(null)
-    })
+      return
+    }
+
+    let mounted = true
+    const refreshHistory = async () => {
+      const history = await window.deskbike.getSessionHistory(selectedSensor)
+      if (!mounted) return
+      setSessions(history)
+      setSelectedSession((current) => {
+        if (!current) return null
+        return history.find((s) => s.id === current.id) ?? null
+      })
+    }
+
+    void refreshHistory()
+    const interval = setInterval(() => {
+      void refreshHistory()
+    }, 1500)
+
+    return () => {
+      mounted = false
+      clearInterval(interval)
+    }
   }, [selectedSensor])
 
   return (

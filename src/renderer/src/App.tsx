@@ -48,7 +48,10 @@ export default function App() {
         ))}
       </div>
 
-      {activeTab === 'live' ? <DiagnosticTab /> : <HistoryTab />}
+      <div style={{ display: activeTab === 'live' ? 'block' : 'none' }}>
+        <DiagnosticTab />
+      </div>
+      {activeTab === 'history' ? <HistoryTab /> : null}
     </div>
   )
 }
