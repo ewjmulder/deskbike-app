@@ -1,7 +1,7 @@
 // src/renderer/src/ble/adapter.ts
 
 import { MockAdapter } from './mock'
-import { WebBluetoothAdapter } from './web-bluetooth'
+import { IpcBleAdapter } from './ipc-adapter'
 
 export interface DeviceInfo {
   id: string
@@ -15,7 +15,7 @@ export type DeviceFoundHandler = (device: DeviceInfo) => void
 export interface BleAdapter {
   /** Start scanning. Calls onFound for each discovered device. */
   startScan(onFound: DeviceFoundHandler): void
-  /** Select a device (ends scan) and connect to it. */
+  /** Select a device (ends scan) and connect to it. Resolves when connected. */
   selectDevice(
     deviceId: string,
     onData: DataHandler,
@@ -31,6 +31,6 @@ export function createBleAdapter(): BleAdapter {
     console.log('[BLE] using MockAdapter')
     return new MockAdapter()
   }
-  console.log('[BLE] using WebBluetoothAdapter')
-  return new WebBluetoothAdapter()
+  console.log('[BLE] using IpcBleAdapter')
+  return new IpcBleAdapter()
 }
