@@ -12,7 +12,6 @@ export default function App() {
   const adapter = useRef<BleAdapter | null>(null)
   const [status, setStatus] = useState('idle')
   const [errorDetail, setErrorDetail] = useState<string | null>(null)
-  const [bleAvailable, setBleAvailable] = useState<boolean | null>(null)
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [packetCount, setPacketCount] = useState(0)
   const [lastHex, setLastHex] = useState<string | null>(null)
@@ -23,17 +22,7 @@ export default function App() {
   }, [logs])
 
   useEffect(() => {
-    const isMock = window.deskbike.isMock
-    const hasNavigatorBluetooth = typeof navigator.bluetooth !== 'undefined'
-    console.log('[App] mount — isMock:', isMock, 'navigator.bluetooth:', hasNavigatorBluetooth)
-    setBleAvailable(isMock || hasNavigatorBluetooth)
-
-    if (hasNavigatorBluetooth) {
-      navigator.bluetooth.getAvailability()
-        .then((available) => console.log('[App] navigator.bluetooth.getAvailability():', available))
-        .catch((err) => console.warn('[App] getAvailability failed:', err?.message ?? err))
-    }
-
+    console.log('[App] mount — isMock:', window.deskbike.isMock)
     try {
       adapter.current = createBleAdapter()
       console.log('[App] BleAdapter created:', adapter.current.constructor.name)
@@ -55,6 +44,10 @@ export default function App() {
     setDevices([])
     setErrorDetail(null)
     setStatus('scanning')
+    window.deskbike.onBleError((message) => {
+      setErrorDetail(`BLE error: ${message}`)
+      setStatus('error')
+    })
     try {
       adapter.current.startScan((device) => {
         console.log('[App] device found:', device)
@@ -122,9 +115,7 @@ export default function App() {
       <h2>DeskBike — diagnostic view</h2>
 
       <p>
-        Mode: <strong>{window.deskbike.isMock ? 'MOCK' : 'Web Bluetooth'}</strong>
-        {' | '}
-        navigator.bluetooth: <strong>{bleAvailable === null ? '…' : bleAvailable ? 'available' : 'MISSING'}</strong>
+        Mode: <strong>{window.deskbike.isMock ? 'MOCK' : 'Bleak (Python)'}</strong>
       </p>
 
       <p>Status: <strong>{status}</strong></p>

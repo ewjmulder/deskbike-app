@@ -1,8 +1,8 @@
 // src/renderer/src/env.d.ts
 
 interface BtDevice {
-  deviceId: string
-  deviceName: string
+  id: string
+  name: string
 }
 
 interface MeasurementData {
@@ -17,21 +17,16 @@ interface MeasurementData {
   crankTime: number | null
 }
 
-// Minimal Web Bluetooth types not yet in TypeScript's standard lib.dom.d.ts
-interface Bluetooth {
-  getAvailability(): Promise<boolean>
-  requestDevice(options?: RequestDeviceOptions): Promise<BluetoothDevice>
-}
-
-interface Navigator {
-  readonly bluetooth: Bluetooth
-}
-
 interface Window {
   deskbike: {
     isMock: boolean
-    onDevicesFound: (cb: (devices: BtDevice[]) => void) => void
-    selectBleDevice: (deviceId: string) => Promise<void>
+    scanStart: () => Promise<void>
+    connect: (deviceId: string) => Promise<void>
+    disconnect: () => Promise<void>
     saveMeasurement: (data: MeasurementData) => Promise<void>
+    onDeviceFound: (cb: (device: BtDevice) => void) => void
+    onData: (cb: (raw: number[]) => void) => void
+    onDisconnected: (cb: () => void) => void
+    onBleError: (cb: (message: string) => void) => void
   }
 }
