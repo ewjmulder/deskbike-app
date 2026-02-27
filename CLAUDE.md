@@ -107,6 +107,18 @@ The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUI
 
 `package.json` lists `electron-rebuild` in scripts but the actual installed package is `@electron/rebuild` (official successor). The `electron-rebuild` binary still works — it's provided by `@electron/rebuild`. Do not add `electron-rebuild` as a separate dependency.
 
+## Packaging gotchas
+
+**Drizzle migrations** — `src/main/db/migrations/` must be in `extraResources` in `electron-builder.yml` so packaged apps can find them at `process.resourcesPath + '/migrations'` (already expected by `src/main/db/index.ts`).
+
+**Do not use `ELECTRON_SKIP_BINARY_DOWNLOAD=1` in CI** — electron-builder needs to download the Electron binary when packaging. Skipping it during `pnpm install` causes an EOF error on macOS during the package step.
+
+**Download build artifacts from CI:**
+```bash
+gh run list --workflow=build.yml --limit=5
+gh run download RUN_ID --name deskbike-linux --dir ~/Downloads/deskbike-linux
+```
+
 ## Tech stack
 
 | Layer | Technology |
