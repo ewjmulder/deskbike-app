@@ -10,6 +10,7 @@ Cross-platform desktop app (Windows, macOS, Linux) for desk bike CSC (Cycling Sp
 ## Commands
 
 ```bash
+pip install bleak  # One-time setup: install Python BLE library for helper process
 pnpm dev          # Start Electron app in development mode (hot reload)
 pnpm build        # Build for production
 pnpm test         # Run all tests (Vitest)
@@ -33,7 +34,9 @@ node node_modules/electron/install.js
 
 ```
 src/
-  main/          # Electron main process (Node.js) — SQLite, IPC, BT session
+  main/          # Electron main process (Node.js) — SQLite, IPC, BLE helper
+    ble/
+      helper.ts        # Spawns ble_helper.py, speaks JSON lines protocol, emits events
     db/
       schema.ts        # Drizzle ORM schema (all 5 tables)
       index.ts         # DB init: opens SQLite, runs migrations
@@ -42,7 +45,6 @@ src/
     ipc/
       handlers.ts      # IPC handler registration (ble:select-device, ble:save-measurement)
     index.ts           # Electron entry: initDb → registerIpcHandlers → createWindow
-                       # Also: session.on('select-bluetooth-device') for Web Bluetooth device picking
   preload/
     index.ts     # contextBridge: exposes window.deskbike to renderer
   renderer/      # React app (Vite, Chromium)
@@ -51,9 +53,12 @@ src/
       env.d.ts         # window.deskbike type declarations
       ble/
         adapter.ts       # BleAdapter interface + createBleAdapter() factory
-        web-bluetooth.ts # WebBluetoothAdapter: navigator.bluetooth (real hardware)
+        ipc.ts           # IpcBleAdapter: talks to main process via IPC (real hardware)
         mock.ts          # MockAdapter: pure JS timer (MOCK_BLE=1)
         csc-parser.ts    # parseRawCsc + computeDeltas (Uint8Array/DataView)
+  helpers/
+    ble_helper.py  # Python BLE helper process (bleak); JSON lines over stdin/stdout
+requirements.txt   # Python dependencies (bleak)
 scripts/
   emulator.ts    # Standalone BLE CSC peripheral emulator (@abandonware/bleno)
 tests/
@@ -74,9 +79,9 @@ docs/
 2. CSC decoded: `has_wheel_data`, `has_crank_data`, `wheel_revs`, `wheel_time`, `crank_revs`, `crank_time`
 3. Deltas: `time_diff_ms`, `*_diff` fields (rollover-corrected with `>>> 0` for uint32, `& 0xffff` for uint16)
 
-**IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. BLE runs entirely in the renderer via Web Bluetooth; only DB persistence goes through IPC.
+**IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. BLE is managed in the main process via the helper process; the renderer communicates with it through IPC. DB persistence also goes through IPC.
 
-**BLE architecture** — BLE central role uses `navigator.bluetooth` (Web Bluetooth API) in the renderer — no native module, no Linux permissions required. The main process registers a `session.on('select-bluetooth-device')` handler that forwards discovered devices to the renderer, so our own UI acts as the device picker. `@abandonware/bleno` is used only for the emulator peripheral role.
+**BLE architecture** — BLE central role is handled by `src/helpers/ble_helper.py`, a Python subprocess spawned by the main process (`src/main/ble/helper.ts`) via `child_process.spawn`. Communication uses a JSON lines protocol over stdin/stdout. This approach uses BlueZ D-Bus on Linux, CoreBluetooth on macOS, and WinRT on Windows — no `setcap` or special permissions required. The renderer's `IpcBleAdapter` (`src/renderer/src/ble/ipc.ts`) communicates with the main process via IPC. `@abandonware/bleno` is used only for the emulator peripheral role.
 
 ## Database
 
@@ -94,7 +99,7 @@ sqlite3 ~/.config/deskbike-app/deskbike.sqlite "SELECT sensor_id, timestamp_utc,
 
 The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUID `1816`. It simulates 15–20 km/h and 65–75 RPM using sine/cosine waves.
 
-**Linux:** No adapter conflicts — `navigator.bluetooth` (Web Bluetooth, renderer) and `bleno` (peripheral, emulator) use different subsystems. The emulator can run on the same machine as the app.
+**Linux:** No adapter conflicts — the bleak helper process and `bleno` (peripheral, emulator) use different subsystems. The emulator can run on the same machine as the app.
 
 **Software mock (no hardware):** `MOCK_BLE=1 pnpm dev` starts the app with a built-in mock that emits synthetic CSC packets every second (15–20 km/h, 65–75 RPM). The mock device appears as `DeskBike-MOCK` in the scan results.
 
@@ -109,7 +114,7 @@ The emulator (`pnpm emulator`) advertises as `DeskBike-EMU` with CSC service UUI
 | Runtime | Electron 33 |
 | Language | TypeScript 5 |
 | Frontend | React 18 + Vite (electron-vite 3) |
-| BLE central | Web Bluetooth API (navigator.bluetooth) |
+| BLE central | Python + bleak (via child process, JSON lines IPC) |
 | BLE peripheral (emulator) | @abandonware/bleno |
 | Database | SQLite via better-sqlite3 |
 | ORM | Drizzle ORM + drizzle-kit |
