@@ -1,9 +1,11 @@
 // src/renderer/src/App.tsx
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createBleAdapter } from './ble/adapter'
 import type { BleAdapter, DeviceInfo } from './ble/adapter'
 import { parseRawCsc } from './ble/csc-parser'
+import { computeDeltas } from './ble/csc-parser'
+import type { CscRawFields } from './ble/csc-parser'
 import { useDevLog } from './useDevLog'
 
 export default function App() {
@@ -15,6 +17,27 @@ export default function App() {
   const [devices, setDevices] = useState<DeviceInfo[]>([])
   const [packetCount, setPacketCount] = useState(0)
   const [lastHex, setLastHex] = useState<string | null>(null)
+  const [mockSpeedKmh, setMockSpeedKmh] = useState(17.5)
+
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionHistory, setSessionHistory] = useState<SessionRecord[]>([])
+  const [connectedDeviceId, setConnectedDeviceId] = useState<string | null>(null)
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
+  const [liveSpeed, setLiveSpeed] = useState<number | null>(null)
+  const [liveCadence, setLiveCadence] = useState<number | null>(null)
+  const [sessionDistance, setSessionDistance] = useState(0)
+
+  const sessionIdRef = useRef<string | null>(null)
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevCscRef = useRef<CscRawFields | null>(null)
+  const prevTimestampRef = useRef<number | null>(null)
+  const sessionDistanceRef = useRef(0)
+
+  const INACTIVITY_MS = 2 * 60 * 1000
+  const WHEEL_CIRCUMFERENCE_M = 2.105
+
+  const MOCK_SPEED_MIN = 0
+  const MOCK_SPEED_MAX = 40
 
   // Auto-scroll log panel to bottom on new entries
   useEffect(() => {
@@ -37,6 +60,21 @@ export default function App() {
       setErrorDetail(`BLE error: ${message}`)
       setStatus('error')
     })
+  }, [])
+
+  const endActiveSession = useCallback(async () => {
+    if (!sessionIdRef.current) return
+    const endedAt = new Date().toISOString()
+    await window.deskbike.sessionEnd(sessionIdRef.current, endedAt)
+    sessionIdRef.current = null
+    setSessionId(null)
+    setSessionStartedAt(null)
+    setLiveSpeed(null)
+    setLiveCadence(null)
+    setSessionDistance(0)
+    sessionDistanceRef.current = 0
+    prevCscRef.current = null
+    prevTimestampRef.current = null
   }, [])
 
   function handleScan(): void {
@@ -69,9 +107,48 @@ export default function App() {
     try {
       await adapter.current!.selectDevice(
         deviceId,
-        (data) => {
+        async (data) => {
           const parsed = parseRawCsc(data)
-          const timestampUtc = new Date().toISOString()
+          const now = Date.now()
+          const timestampUtc = new Date(now).toISOString()
+
+          // Start session on first packet
+          if (!sessionIdRef.current) {
+            const { sessionId: sid } = await window.deskbike.sessionStart(deviceId, timestampUtc)
+            sessionIdRef.current = sid
+            setSessionId(sid)
+            setSessionStartedAt(timestampUtc)
+          }
+
+          // Reset inactivity timer
+          if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+          inactivityTimerRef.current = setTimeout(async () => {
+            await endActiveSession()
+          }, INACTIVITY_MS)
+
+          // Compute live speed/cadence from deltas
+          if (prevCscRef.current && prevTimestampRef.current !== null) {
+            const timeDiffMs = now - prevTimestampRef.current
+            const deltas = computeDeltas(parsed, prevCscRef.current, timeDiffMs)
+
+            if (deltas.wheelRevsDiff !== null && deltas.wheelRevsDiff > 0 &&
+                deltas.wheelTimeDiff !== null && deltas.wheelTimeDiff > 0) {
+              const distM = deltas.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
+              const timeS = deltas.wheelTimeDiff / 1024
+              setLiveSpeed((distM / timeS) * 3.6)
+              sessionDistanceRef.current += distM
+              setSessionDistance(sessionDistanceRef.current)
+            }
+
+            if (deltas.crankRevsDiff !== null && deltas.crankRevsDiff > 0 &&
+                deltas.crankTimeDiff !== null && deltas.crankTimeDiff > 0) {
+              setLiveCadence((deltas.crankRevsDiff / (deltas.crankTimeDiff / 1024)) * 60)
+            }
+          }
+          prevCscRef.current = parsed
+          prevTimestampRef.current = now
+
+          // Existing hex display and save
           const hex = Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ')
           console.log(`[App] data packet: ${hex}`)
           console.log(`[App] parsed: wheel=${parsed.hasWheelData} crank=${parsed.hasCrankData} wheelRevs=${parsed.wheelRevs} crankRevs=${parsed.crankRevs}`)
@@ -96,6 +173,9 @@ export default function App() {
       )
       console.log('[App] connected successfully')
       setStatus('connected')
+      setConnectedDeviceId(deviceId)
+      const history = await window.deskbike.getSessionHistory(deviceId)
+      setSessionHistory(history)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       console.error('[App] connect failed:', err)
@@ -106,72 +186,117 @@ export default function App() {
 
   async function handleDisconnect(): Promise<void> {
     console.log('[App] handleDisconnect')
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current)
+      inactivityTimerRef.current = null
+    }
+    await endActiveSession()
     if (!adapter.current) return
     await adapter.current.disconnect()
     setStatus('disconnected')
+    setConnectedDeviceId(null)
+  }
+
+  function handleMockSpeedChange(kmh: number): void {
+    setMockSpeedKmh(kmh)
+    window.deskbike.mockSetSpeed(kmh)
   }
 
   return (
-    <div style={{ fontFamily: 'monospace', padding: 24 }}>
-      <h2>DeskBike — diagnostic view</h2>
+    <div style={{ fontFamily: 'monospace', padding: 24, display: 'flex', gap: 32, alignItems: 'flex-start' }}>
+      {/* Main content */}
+      <div style={{ flex: 1 }}>
+        <h2>DeskBike — diagnostic view</h2>
 
-      <p>
-        Mode: <strong>{window.deskbike.isMock ? 'MOCK' : 'Bleak (Python)'}</strong>
-      </p>
+        <p>
+          Mode: <strong>{window.deskbike.isMock ? 'MOCK' : 'Bleak (Python)'}</strong>
+        </p>
 
-      <p>Status: <strong>{status}</strong></p>
-      {errorDetail && (
-        <p style={{ color: 'red' }}>Error: {errorDetail}</p>
-      )}
+        <p>Status: <strong>{status}</strong></p>
+        {errorDetail && (
+          <p style={{ color: 'red' }}>Error: {errorDetail}</p>
+        )}
 
-      <button onClick={handleScan} disabled={status === 'scanning' || status === 'connected'}>Scan</button>
-      {' '}
-      <button onClick={handleDisconnect} disabled={status !== 'connected'}>Disconnect</button>
+        <button onClick={handleScan} disabled={status === 'scanning' || status === 'connected'}>Scan</button>
+        {' '}
+        <button onClick={handleDisconnect} disabled={status !== 'connected'}>Disconnect</button>
 
-      {devices.length > 0 && (
-        <div>
-          <h3>Devices found:</h3>
-          <ul>
-            {devices.map((d) => (
-              <li key={d.id}>
-                {d.name} ({d.id}){' '}
-                <button onClick={() => handleConnect(d.id)}>Connect</button>
-              </li>
+        {devices.length > 0 && status !== 'connected' && (
+          <div>
+            <h3>Devices found:</h3>
+            <ul>
+              {devices.map((d) => (
+                <li key={d.id}>
+                  {d.name} ({d.id}){' '}
+                  <button onClick={() => handleConnect(d.id)}>Connect</button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {lastHex && (
+          <div>
+            <h3>Live data (packet #{packetCount})</h3>
+            <p>Raw bytes: <code>{lastHex}</code></p>
+          </div>
+        )}
+
+        <div style={{ marginTop: 24 }}>
+          <h3 style={{ marginBottom: 4 }}>Log ({logs.length})</h3>
+          <div style={{
+            height: 220,
+            overflowY: 'auto',
+            background: '#111',
+            color: '#eee',
+            fontSize: 11,
+            padding: '6px 8px',
+            borderRadius: 4,
+          }}>
+            {logs.map((e, i) => (
+              <div key={i} style={{
+                color: e.level === 'error' ? '#f77' : e.level === 'warn' ? '#fa0' : '#cfc',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+              }}>
+                {e.ts} {e.message}
+              </div>
             ))}
-          </ul>
-        </div>
-      )}
-
-      {lastHex && (
-        <div>
-          <h3>Live data (packet #{packetCount})</h3>
-          <p>Raw bytes: <code>{lastHex}</code></p>
-        </div>
-      )}
-
-      <div style={{ marginTop: 24 }}>
-        <h3 style={{ marginBottom: 4 }}>Log ({logs.length})</h3>
-        <div style={{
-          height: 220,
-          overflowY: 'auto',
-          background: '#111',
-          color: '#eee',
-          fontSize: 11,
-          padding: '6px 8px',
-          borderRadius: 4,
-        }}>
-          {logs.map((e, i) => (
-            <div key={i} style={{
-              color: e.level === 'error' ? '#f77' : e.level === 'warn' ? '#fa0' : '#cfc',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-            }}>
-              {e.ts} {e.message}
-            </div>
-          ))}
-          <div ref={logEndRef} />
+            <div ref={logEndRef} />
+          </div>
         </div>
       </div>
+
+      {/* Mock speed slider — only shown in MOCK mode */}
+      {window.deskbike.isMock && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          paddingTop: 8,
+          userSelect: 'none',
+        }}>
+          <span style={{ fontSize: 12 }}>{MOCK_SPEED_MAX} km/h</span>
+          <input
+            type="range"
+            min={MOCK_SPEED_MIN}
+            max={MOCK_SPEED_MAX}
+            step={0.5}
+            value={mockSpeedKmh}
+            onChange={(e) => handleMockSpeedChange(Number(e.target.value))}
+            style={{
+              writingMode: 'vertical-lr',
+              direction: 'rtl',
+              height: 240,
+              cursor: 'pointer',
+            }}
+          />
+          <span style={{ fontSize: 12 }}>{MOCK_SPEED_MIN} km/h</span>
+          <strong style={{ marginTop: 4, fontSize: 14 }}>{mockSpeedKmh.toFixed(1)} km/h</strong>
+          <span style={{ fontSize: 10, color: '#888' }}>mock speed</span>
+        </div>
+      )}
     </div>
   )
 }
