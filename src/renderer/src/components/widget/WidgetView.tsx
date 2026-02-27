@@ -24,10 +24,11 @@ function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
 }
 
-export default function WidgetView(): JSX.Element {
+export default function WidgetView(): React.JSX.Element {
   const [metrics, setMetrics] = useState<Metrics>({ speedKmh: null, cadenceRpm: null, distanceM: 0, elapsedS: 0 })
   const [connected, setConnected] = useState(false)
 
+  const connectedRef = useRef(false)
   const prevCscRef = useRef<CscRawFields | null>(null)
   const prevTimestampRef = useRef<number | null>(null)
   const sessionStartRef = useRef<number | null>(null)
@@ -50,6 +51,7 @@ export default function WidgetView(): JSX.Element {
     prevTimestampRef.current = null
     sessionStartRef.current = null
     distanceRef.current = 0
+    connectedRef.current = false
     setConnected(false)
     setMetrics({ speedKmh: null, cadenceRpm: null, distanceM: 0, elapsedS: 0 })
   }, [])
@@ -59,25 +61,33 @@ export default function WidgetView(): JSX.Element {
       const now = Date.now()
       const parsed = parseRawCsc(new Uint8Array(raw))
 
-      if (!connected) { setConnected(true); startElapsed() }
+      if (!connectedRef.current) {
+        connectedRef.current = true
+        setConnected(true)
+        startElapsed()
+      }
 
       if (prevCscRef.current && prevTimestampRef.current !== null) {
         const deltas = computeDeltas(parsed, prevCscRef.current, now - prevTimestampRef.current)
-        setMetrics((m) => {
-          let { speedKmh, cadenceRpm, distanceM } = m
-          if (deltas.wheelRevsDiff !== null && deltas.wheelRevsDiff > 0 &&
-              deltas.wheelTimeDiff !== null && deltas.wheelTimeDiff > 0) {
-            const d = deltas.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
-            speedKmh = (d / (deltas.wheelTimeDiff / 1024)) * 3.6
-            distanceRef.current += d
-            distanceM = distanceRef.current
-          }
-          if (deltas.crankRevsDiff !== null && deltas.crankRevsDiff > 0 &&
-              deltas.crankTimeDiff !== null && deltas.crankTimeDiff > 0) {
-            cadenceRpm = (deltas.crankRevsDiff / (deltas.crankTimeDiff / 1024)) * 60
-          }
-          return { ...m, speedKmh, cadenceRpm, distanceM }
-        })
+        let distanceDelta = 0
+        let speedKmh: number | null = null
+        let cadenceRpm: number | null = null
+        if (deltas.wheelRevsDiff !== null && deltas.wheelRevsDiff > 0 &&
+            deltas.wheelTimeDiff !== null && deltas.wheelTimeDiff > 0) {
+          distanceDelta = deltas.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
+          speedKmh = (distanceDelta / (deltas.wheelTimeDiff / 1024)) * 3.6
+          distanceRef.current += distanceDelta
+        }
+        if (deltas.crankRevsDiff !== null && deltas.crankRevsDiff > 0 &&
+            deltas.crankTimeDiff !== null && deltas.crankTimeDiff > 0) {
+          cadenceRpm = (deltas.crankRevsDiff / (deltas.crankTimeDiff / 1024)) * 60
+        }
+        setMetrics((m) => ({
+          ...m,
+          ...(speedKmh !== null && { speedKmh }),
+          ...(cadenceRpm !== null && { cadenceRpm }),
+          distanceM: distanceRef.current,
+        }))
       }
       prevCscRef.current = parsed
       prevTimestampRef.current = now
@@ -85,7 +95,7 @@ export default function WidgetView(): JSX.Element {
 
     window.deskbike.onDisconnected(reset)
     return () => { if (elapsedIntervalRef.current) clearInterval(elapsedIntervalRef.current) }
-  }, [connected, startElapsed, reset])
+  }, [startElapsed, reset])
 
   return (
     <div style={{
