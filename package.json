@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "emulator": "tsx scripts/emulator.ts",
-    "dist": "pnpm build && pnpm build:helper && electron-builder"
+    "dist": "pnpm build && pnpm build:helper && npx electron-builder --publish never"
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
