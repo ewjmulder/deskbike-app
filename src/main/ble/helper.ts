@@ -44,8 +44,9 @@ export class BleHelper {
       helperArgs = []
     } else {
       const helperPath = join(app.getAppPath(), 'src', 'helpers', 'ble_helper.py')
-      const venvPython = join(app.getAppPath(), '.venv', 'bin', 'python3')
-      helperBin = existsSync(venvPython) ? venvPython : 'python3'
+      const isWin = process.platform === 'win32'
+      const venvPython = join(app.getAppPath(), '.venv', isWin ? 'Scripts/python.exe' : 'bin/python3')
+      helperBin = existsSync(venvPython) ? venvPython : (isWin ? 'python.exe' : 'python3')
       helperArgs = [helperPath]
     }
 
