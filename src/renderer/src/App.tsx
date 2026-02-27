@@ -94,10 +94,13 @@ export default function App() {
 
   const endActiveSession = useCallback(async () => {
     if (!sessionIdRef.current || sessionIdRef.current === 'pending') return
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current)
+      inactivityTimerRef.current = null
+    }
     const endedAt = new Date().toISOString()
     await window.deskbike.sessionEnd(sessionIdRef.current, endedAt)
     sessionIdRef.current = null
-    inactivityTimerRef.current = null
     setSessionId(null)
     setSessionStartedAt(null)
     setLiveSpeed(null)
@@ -198,9 +201,11 @@ export default function App() {
             crankTime: parsed.crankTime,
           })
         },
-        () => {
+        async () => {
           console.log('[App] disconnected (remote)')
+          await endActiveSession()
           setStatus('disconnected')
+          setConnectedDeviceId(null)
         }
       )
       console.log('[App] connected successfully')
