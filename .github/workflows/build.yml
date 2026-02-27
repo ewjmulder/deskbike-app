@@ -1,0 +1,85 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Create Python venv and install runtime deps
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+
+      - name: Install Node dependencies
+        run: pnpm install
+
+      - name: Rebuild native modules for Electron
+        run: pnpm electron-rebuild -f -w better-sqlite3
+
+      - name: Build BLE helper binary
+        run: pnpm build:helper
+
+      - name: Compile TypeScript / React
+        run: pnpm build
+
+      - name: Package with electron-builder
+        run: npx electron-builder --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux artifacts
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskbike-linux
+          path: |
+            release/*.AppImage
+            release/*.deb
+          if-no-files-found: warn
+
+      - name: Upload macOS artifacts
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskbike-macos
+          path: release/*.dmg
+          if-no-files-found: warn
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deskbike-windows
+          path: |
+            release/*.exe
+            release/*.msi
+          if-no-files-found: warn
