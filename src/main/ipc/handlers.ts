@@ -1,31 +1,66 @@
 // src/main/ipc/handlers.ts
 
-import { ipcMain } from 'electron'
-import { insertMeasurement } from '../db/queries'
+import { ipcMain, WebContents } from 'electron'
+import { insertMeasurement, InsertMeasurementInput } from '../db/queries'
+import { BleHelper } from '../ble/helper'
 
-let pendingBluetoothCallback: ((deviceId: string) => void) | null = null
-
-export function setPendingBluetoothCallback(cb: ((deviceId: string) => void) | null): void {
-  pendingBluetoothCallback = cb
-}
-
-export function registerIpcHandlers(): void {
+export function registerIpcHandlers(webContents: WebContents, helper: BleHelper): void {
   console.log('[IPC] registerIpcHandlers')
 
-  // Called by renderer when user clicks a device in our scan UI
-  ipcMain.handle('ble:select-device', (_e, deviceId: string) => {
-    console.log(`[IPC] ble:select-device → ${deviceId}, pendingCallback=${pendingBluetoothCallback !== null}`)
-    if (pendingBluetoothCallback) {
-      pendingBluetoothCallback(deviceId)
-      pendingBluetoothCallback = null
-    } else {
-      console.warn('[IPC] ble:select-device: no pending Bluetooth callback!')
+  let pendingConnectResolve: (() => void) | null = null
+  let pendingConnectReject: ((err: Error) => void) | null = null
+
+  // Forward helper events to renderer
+  helper.setEventHandler((event) => {
+    console.log(`[IPC] helper event: ${event.type}`)
+    switch (event.type) {
+      case 'device':
+        webContents.send('ble:device-found', { id: event.id, name: event.name })
+        break
+      case 'connected':
+        pendingConnectResolve?.()
+        pendingConnectResolve = null
+        pendingConnectReject = null
+        break
+      case 'data':
+        webContents.send('ble:data', event.raw)
+        break
+      case 'disconnected':
+        webContents.send('ble:disconnected')
+        break
+      case 'error':
+        if (pendingConnectReject) {
+          pendingConnectReject(new Error(event.message))
+          pendingConnectResolve = null
+          pendingConnectReject = null
+        } else {
+          webContents.send('ble:error', event.message)
+        }
+        break
     }
   })
 
-  // Called by renderer with parsed measurement data for DB persistence
-  ipcMain.handle('ble:save-measurement', (_e, data) => {
-    console.log(`[IPC] ble:save-measurement: sensorId=${data.sensorId} wheel=${data.hasWheelData} crank=${data.hasCrankData}`)
+  ipcMain.handle('ble:scan-start', () => {
+    console.log('[IPC] ble:scan-start')
+    helper.send({ cmd: 'scan' })
+  })
+
+  ipcMain.handle('ble:connect', (_e, deviceId: string) => {
+    console.log(`[IPC] ble:connect → ${deviceId}`)
+    return new Promise<void>((resolve, reject) => {
+      pendingConnectResolve = resolve
+      pendingConnectReject = reject
+      helper.send({ cmd: 'connect', device_id: deviceId })
+    })
+  })
+
+  ipcMain.handle('ble:disconnect', () => {
+    console.log('[IPC] ble:disconnect')
+    helper.send({ cmd: 'disconnect' })
+  })
+
+  ipcMain.handle('ble:save-measurement', (_e, data: InsertMeasurementInput) => {
+    console.log(`[IPC] ble:save-measurement: sensorId=${data.sensorId}`)
     insertMeasurement(data)
   })
 }

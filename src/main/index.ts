@@ -1,12 +1,12 @@
 // src/main/index.ts
 
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { initDb } from './db/index'
-import { registerIpcHandlers, setPendingBluetoothCallback } from './ipc/handlers'
+import { registerIpcHandlers } from './ipc/handlers'
+import { BleHelper } from './ble/helper'
 
-// Required for navigator.bluetooth to be defined in the renderer
-app.commandLine.appendSwitch('enable-experimental-web-platform-features')
+const helper = new BleHelper()
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -15,25 +15,11 @@ function createWindow(): BrowserWindow {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      nodeIntegration: false
-    }
+      nodeIntegration: false,
+    },
   })
 
-  // Log all permission requests so we can see exactly what Chromium asks for
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    console.log(`[Main] permission requested: "${permission}" → granted`)
-    callback(true)
-  })
-
-  // Intercept Electron's Bluetooth device picker so our renderer UI acts as the picker
-  session.defaultSession.on('select-bluetooth-device', (event, deviceList, callback) => {
-    console.log(`[Main] select-bluetooth-device: ${deviceList.length} device(s)`, deviceList.map((d) => d.deviceName || d.deviceId))
-    event.preventDefault()
-    setPendingBluetoothCallback(callback)
-    win.webContents.send('ble:devices-found', deviceList)
-  })
-
-  // Forward renderer console output to the main process terminal
+  // Forward renderer console output to terminal
   const levels = ['V', 'I', 'W', 'E']
   win.webContents.on('console-message', (_e, level, message) => {
     const prefix = `[renderer:${levels[level] ?? '?'}]`
@@ -54,13 +40,21 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
-  console.log(`[Main] app ready — MOCK_BLE=${process.env['MOCK_BLE'] ?? 'unset'}`)
+  const isMock = process.env['MOCK_BLE'] === '1'
+  console.log(`[Main] app ready — MOCK_BLE=${isMock ? '1' : 'unset'}`)
   initDb()
-  registerIpcHandlers()
-  createWindow()
+
+  const win = createWindow()
+
+  if (!isMock) {
+    helper.start()
+  }
+
+  registerIpcHandlers(win.webContents, helper)
   console.log('[Main] window created')
 })
 
 app.on('window-all-closed', () => {
+  helper.stop()
   if (process.platform !== 'darwin') app.quit()
 })
