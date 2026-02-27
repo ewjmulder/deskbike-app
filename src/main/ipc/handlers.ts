@@ -1,10 +1,10 @@
 // src/main/ipc/handlers.ts
 
 import { ipcMain, WebContents } from 'electron'
-import { insertMeasurement, InsertMeasurementInput } from '../db/queries'
-import { BleHelper } from '../ble/helper'
+import { insertMeasurement, InsertMeasurementInput, startSession, endSession, getSessionHistory } from '../db/queries'
+import type { IBleHelper } from '../ble/helper'
 
-export function registerIpcHandlers(webContents: WebContents, helper: BleHelper): void {
+export function registerIpcHandlers(webContents: WebContents, helper: IBleHelper): void {
   console.log('[IPC] registerIpcHandlers')
 
   let pendingConnectResolve: (() => void) | null = null
@@ -66,5 +66,25 @@ export function registerIpcHandlers(webContents: WebContents, helper: BleHelper)
   ipcMain.handle('ble:save-measurement', (_e, data: InsertMeasurementInput) => {
     console.log(`[IPC] ble:save-measurement: sensorId=${data.sensorId}`)
     insertMeasurement(data)
+  })
+
+  ipcMain.handle('ble:mock-set-speed', (_e, kmh: number) => {
+    helper.setMockSpeedKmh?.(kmh)
+  })
+
+  ipcMain.handle('session:start', (_e, { sensorId, startedAt }: { sensorId: string; startedAt: string }) => {
+    console.log(`[IPC] session:start sensorId=${sensorId}`)
+    const sessionId = startSession(sensorId, startedAt)
+    return { sessionId }
+  })
+
+  ipcMain.handle('session:end', (_e, { sessionId, endedAt }: { sessionId: string; endedAt: string }) => {
+    console.log(`[IPC] session:end sessionId=${sessionId}`)
+    endSession(sessionId, endedAt)
+  })
+
+  ipcMain.handle('session:get-history', (_e, { sensorId }: { sensorId: string }) => {
+    console.log(`[IPC] session:get-history sensorId=${sensorId}`)
+    return getSessionHistory(sensorId)
   })
 }
