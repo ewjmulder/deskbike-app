@@ -23,6 +23,12 @@ export class WindowManager {
   }
 
   createDashboard(): BrowserWindow {
+    if (this.dashboard && !this.dashboard.isDestroyed()) {
+      this.dashboard.show()
+      this.dashboard.focus()
+      return this.dashboard
+    }
+
     const win = new BrowserWindow({
       width: 900,
       height: 600,
@@ -150,7 +156,8 @@ export class WindowManager {
 
   setWidgetOpacity(value: number): void {
     if (!this.widget || this.widget.isDestroyed()) return
-    this.widget.setOpacity(Math.min(1, Math.max(0.1, value)))
-    setSetting('widget.opacity', value)
+    const clamped = Math.min(1, Math.max(0.1, value))
+    this.widget.setOpacity(clamped)
+    setSetting('widget.opacity', clamped)
   }
 }
