@@ -12,3 +12,5 @@ dist-helpers/
 *.spec
 build/
 release/
+*.tsbuildinfo
+test-output.txt
