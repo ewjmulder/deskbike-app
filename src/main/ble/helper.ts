@@ -2,6 +2,7 @@
 
 import { spawn, ChildProcess } from 'child_process'
 import { createInterface } from 'readline'
+import { existsSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
 
@@ -38,8 +39,10 @@ export class BleHelper {
       ? join(process.resourcesPath, 'helpers', 'ble_helper.py')
       : join(app.getAppPath(), 'src', 'helpers', 'ble_helper.py')
 
-    console.log(`[BleHelper] spawning python3 ${helperPath}`)
-    this.process = spawn('python3', [helperPath])
+    const venvPython = join(app.getAppPath(), '.venv', 'bin', 'python3')
+    const pythonBin = !app.isPackaged && existsSync(venvPython) ? venvPython : 'python3'
+    console.log(`[BleHelper] spawning ${pythonBin} ${helperPath}`)
+    this.process = spawn(pythonBin, [helperPath])
 
     const rl = createInterface({ input: this.process.stdout! })
     rl.on('line', (line) => {
