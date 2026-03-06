@@ -56,7 +56,7 @@ export function useCscMetrics(options?: UseCscMetricsOptions): {
   processPacket: (data: Uint8Array) => CscRawFields
   reset: () => void
 } {
-  const windowMs = options?.windowMs ?? DEFAULT_WINDOW_MS
+  const windowMsRef = useRef(options?.windowMs ?? DEFAULT_WINDOW_MS)
   const bufferRef = useRef<PacketRecord[]>([])
   const prevParsedRef = useRef<CscRawFields | null>(null)
   const distanceRef = useRef(0)
@@ -71,6 +71,9 @@ export function useCscMetrics(options?: UseCscMetricsOptions): {
       const now = Date.now()
       const parsed = parseRawCsc(data)
 
+      // NOTE: reset() must be called before reconnecting to a new/restarted sensor.
+      // Without reset(), a wheelRevs restart will be interpreted as a massive forward
+      // jump (up to ~4 billion revs) due to the uint32 unsigned rollover correction.
       // Accumulate distance per packet (delta vs previous packet only)
       if (prevParsedRef.current) {
         const prev = prevParsedRef.current
@@ -88,7 +91,7 @@ export function useCscMetrics(options?: UseCscMetricsOptions): {
 
       // Update rolling window and evict old records
       bufferRef.current.push({ timestamp: now, parsed })
-      const cutoff = now - windowMs
+      const cutoff = now - windowMsRef.current
       let i = 0
       while (i < bufferRef.current.length && bufferRef.current[i].timestamp < cutoff) i++
       if (i > 0) bufferRef.current = bufferRef.current.slice(i)
@@ -101,7 +104,7 @@ export function useCscMetrics(options?: UseCscMetricsOptions): {
 
       return parsed
     },
-    [windowMs]
+    []
   )
 
   const reset = useCallback(() => {

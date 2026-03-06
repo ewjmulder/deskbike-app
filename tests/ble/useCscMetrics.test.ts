@@ -99,6 +99,14 @@ describe('computeCadenceFromWindow', () => {
     expect(computeCadenceFromWindow([rec(0, null, null, 50, 1000)])).toBeNull()
   })
 
+  it('returns null when crankTimeDiff is 0', () => {
+    const records = [
+      rec(0,    null, null, 50, 1000),
+      rec(1000, null, null, 51, 1000),  // same crankTime
+    ]
+    expect(computeCadenceFromWindow(records)).toBeNull()
+  })
+
   it('returns null when crankRevsDiff is 0', () => {
     const records = [
       rec(0,    null, null, 50, 1000),
