@@ -78,7 +78,7 @@ export default function HistoryTab() {
       ) : (
         <>
           <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>SENSOR</label>
+            <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 4 }}>SENSOR</label>
             <select
               value={selectedSensor}
               onChange={(e) => setSelectedSensor(e.target.value)}
@@ -94,7 +94,7 @@ export default function HistoryTab() {
             <p style={{ color: '#888' }}>No completed sessions for this sensor.</p>
           ) : (
             <div style={{ marginBottom: 16 }}>
-              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>SESSION</label>
+              <label style={{ fontSize: 12, color: '#aaa', display: 'block', marginBottom: 4 }}>SESSION</label>
               <select
                 value={selectedSession?.id ?? ''}
                 onChange={(e) => {
@@ -124,51 +124,52 @@ export default function HistoryTab() {
               marginTop: 8,
               padding: '12px 16px',
               background: '#111',
-              border: '1px solid #333',
+              border: '1px solid #555',
               borderRadius: 6,
               maxWidth: 400,
+              color: '#fff',
             }}>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>SESSION DETAIL</div>
+              <div style={{ fontSize: 12, color: '#aaa', marginBottom: 8 }}>SESSION DETAIL</div>
               <table style={{ borderCollapse: 'collapse', fontSize: 13, width: '100%' }}>
                 <tbody>
                   <tr>
-                    <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Started</td>
-                    <td>{new Date(selectedSession.startedAt).toLocaleString()}</td>
+                    <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Started</td>
+                    <td style={{ color: '#fff' }}>{new Date(selectedSession.startedAt).toLocaleString()}</td>
                   </tr>
                   {selectedSession.durationS !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Duration</td>
-                      <td>{formatDuration(selectedSession.durationS)}</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Duration</td>
+                      <td style={{ color: '#fff' }}>{formatDuration(selectedSession.durationS)}</td>
                     </tr>
                   )}
                   {selectedSession.distanceM !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Distance</td>
-                      <td>{formatDistance(selectedSession.distanceM)}</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Distance</td>
+                      <td style={{ color: '#fff' }}>{formatDistance(selectedSession.distanceM)}</td>
                     </tr>
                   )}
                   {selectedSession.avgSpeedKmh !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Avg speed</td>
-                      <td>{selectedSession.avgSpeedKmh.toFixed(1)} km/h</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Avg speed</td>
+                      <td style={{ color: '#fff' }}>{selectedSession.avgSpeedKmh.toFixed(1)} km/h</td>
                     </tr>
                   )}
                   {selectedSession.maxSpeedKmh !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Max speed</td>
-                      <td>{selectedSession.maxSpeedKmh.toFixed(1)} km/h</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Max speed</td>
+                      <td style={{ color: '#fff' }}>{selectedSession.maxSpeedKmh.toFixed(1)} km/h</td>
                     </tr>
                   )}
                   {selectedSession.avgCadenceRpm !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Avg cadence</td>
-                      <td>{Math.round(selectedSession.avgCadenceRpm)} RPM</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Avg cadence</td>
+                      <td style={{ color: '#fff' }}>{Math.round(selectedSession.avgCadenceRpm)} RPM</td>
                     </tr>
                   )}
                   {selectedSession.maxCadenceRpm !== null && (
                     <tr>
-                      <td style={{ color: '#888', padding: '3px 20px 3px 0' }}>Max cadence</td>
-                      <td>{Math.round(selectedSession.maxCadenceRpm)} RPM</td>
+                      <td style={{ color: '#aaa', padding: '3px 20px 3px 0' }}>Max cadence</td>
+                      <td style={{ color: '#fff' }}>{Math.round(selectedSession.maxCadenceRpm)} RPM</td>
                     </tr>
                   )}
                 </tbody>

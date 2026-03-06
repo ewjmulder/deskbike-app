@@ -14,3 +14,5 @@ build/
 release/
 *.tsbuildinfo
 test-output.txt
+.native-rebuild-stamp
+.native-cache/

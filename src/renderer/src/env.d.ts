@@ -43,6 +43,7 @@ interface Window {
     onBleError: (cb: (message: string) => void) => void
     mockSetSpeed: (kmh: number) => Promise<void>
     sessionStart: (sensorId: string, startedAt: string) => Promise<{ sessionId: string }>
+    sessionHeartbeat: (sessionId: string, endedAt: string) => void
     sessionEnd: (sessionId: string, endedAt: string) => Promise<void>
     getSessionHistory: (sensorId: string) => Promise<SessionRecord[]>
     getSensors: () => Promise<string[]>

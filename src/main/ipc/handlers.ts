@@ -3,7 +3,7 @@
 import { ipcMain } from 'electron'
 import {
   insertMeasurement, InsertMeasurementInput,
-  startSession, endSession, getSessionHistory,
+  startSession, endSession, touchSession, getSessionHistory,
   getSetting, setSetting,
   getSensorsWithSessions,
 } from '../db/queries'
@@ -70,6 +70,10 @@ export function registerIpcHandlers(windowManager: WindowManager, helper: IBleHe
   ipcMain.handle('ble:save-measurement', (_e, data: InsertMeasurementInput) => {
     console.log(`[IPC] ble:save-measurement: sensorId=${data.sensorId}`)
     insertMeasurement(data)
+  })
+
+  ipcMain.handle('session:heartbeat', (_e, { sessionId, endedAt }: { sessionId: string; endedAt: string }) => {
+    touchSession(sessionId, endedAt)
   })
 
   ipcMain.handle('ble:mock-set-speed', (_e, kmh: number) => {

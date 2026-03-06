@@ -75,6 +75,10 @@ contextBridge.exposeInMainWorld('deskbike', {
     return ipcRenderer.invoke('session:start', { sensorId, startedAt })
   },
 
+  sessionHeartbeat: (sessionId: string, endedAt: string): void => {
+    ipcRenderer.invoke('session:heartbeat', { sessionId, endedAt })
+  },
+
   sessionEnd: (sessionId: string, endedAt: string): Promise<void> => {
     console.log(`[Preload] sessionEnd sessionId=${sessionId}`)
     return ipcRenderer.invoke('session:end', { sessionId, endedAt })

@@ -2,6 +2,7 @@
 
 import { app } from 'electron'
 import { initDb } from './db/index'
+import { closeOrphanedSessions } from './db/queries'
 import { registerIpcHandlers } from './ipc/handlers'
 import type { IBleHelper } from './ble/helper'
 import { BleHelper } from './ble/helper'
@@ -16,6 +17,7 @@ app.whenReady().then(() => {
   const isMock = process.env['MOCK_BLE'] === '1'
   console.log(`[Main] app ready — MOCK_BLE=${isMock ? '1' : 'unset'}`)
   initDb()
+  closeOrphanedSessions()
 
   helper = isMock ? new MockBleHelper() : new BleHelper()
   const windowManager = new WindowManager()

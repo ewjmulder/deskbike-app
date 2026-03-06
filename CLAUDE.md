@@ -4,7 +4,7 @@ Cross-platform desktop app (Windows, macOS, Linux) for desk bike CSC (Cycling Sp
 
 ## Documentation status
 
-- Last updated: 2026-02-27
+- Last updated: 2026-03-06
 - This file reflects the current implementation.
 - Historical plans live in `docs/plans/` and include status banners.
 
@@ -17,12 +17,14 @@ Cross-platform desktop app (Windows, macOS, Linux) for desk bike CSC (Cycling Sp
 
 ```bash
 pip install bleak  # One-time setup: install Python BLE library for helper process
+./run.sh          # Sanity check + test + build + run (real BLE)
+./run.sh mock     # Sanity check + test + build + run (software mock)
 pnpm dev          # Start Electron app in development mode (hot reload)
 pnpm build        # Build for production
 pnpm test         # Run all tests (Vitest)
 pnpm test:watch   # Tests in watch mode
 pnpm db:generate  # Generate Drizzle migrations from schema changes
-pnpm dev:mock        # Start with software BLE mock (no hardware needed)
+pnpm dev:mock     # Start with software BLE mock (no hardware needed)
 ```
 
 After `pnpm install`, native modules are automatically rebuilt for Electron via `postinstall`. If rebuild fails, run manually:
@@ -46,11 +48,11 @@ src/
     db/
       schema.ts        # Drizzle ORM schema (all 5 tables)
       index.ts         # DB init: opens SQLite, runs migrations
-      queries.ts       # insertMeasurement, getRecentMeasurements
+      queries.ts       # insertMeasurement, startSession, endSession, touchSession, closeOrphanedSessions
       migrations/      # Auto-generated SQL — never edit manually
     ipc/
-      handlers.ts      # IPC handlers: ble:scan-start, ble:connect, ble:disconnect, ble:save-measurement, ble:mock-set-speed
-    index.ts           # Electron entry: initDb → registerIpcHandlers → createWindow
+      handlers.ts      # IPC handlers: ble:scan-start, ble:connect, ble:disconnect, ble:save-measurement, ble:mock-set-speed, session:*, settings:*, widget:*
+    index.ts           # Electron entry: initDb → closeOrphanedSessions → registerIpcHandlers → createWindow
   preload/
     index.ts     # contextBridge: exposes window.deskbike to renderer
   renderer/      # React app (Vite, Chromium)
@@ -73,11 +75,14 @@ tests/
     csc-parser.test.ts  # Unit tests for CSC parser (9 tests, including rollover)
     ipc-adapter.test.ts # Unit tests for renderer IPC BLE adapter
   main/
-    ble/helper.test.ts  # Unit tests for helper line protocol parsing
+    ble/helper.test.ts              # Unit tests for helper line protocol parsing
     db/session-stats.test.ts
+    db/session-lifecycle.test.ts    # Unit tests for touchSession + closeOrphanedSessions
+    db/settings.test.ts
 docs/
-  Architecture.md       # Full architecture reference
-  plans/                # Implementation plans (historical)
+  Architecture.md          # Full architecture reference
+  native-addon-abi.md      # Native addon ABI mismatch between system Node and Electron — background, solutions, trade-offs
+  plans/                   # Implementation plans (historical)
 ```
 
 ## Key design decisions
@@ -90,6 +95,17 @@ docs/
 3. Deltas: `time_diff_ms`, `*_diff` fields (rollover-corrected with `>>> 0` for uint32, `& 0xffff` for uint16)
 
 **IPC pattern** — Renderer never touches Node APIs. `src/preload/index.ts` exposes `window.deskbike` via `contextBridge`. BLE is managed in the main process via the helper process; the renderer communicates with it through IPC. DB persistence also goes through IPC.
+
+**Session lifecycle** — Sessions are crash-safe via two mechanisms:
+1. `session:heartbeat` IPC — called fire-and-forget on every BLE data packet; does a lightweight `UPDATE sessions SET ended_at = ?`. So `ended_at` is always current even if the app crashes.
+2. `closeOrphanedSessions()` — runs at startup; closes any sessions still missing `ended_at` (e.g. from a hard kill) using the timestamp of their last measurement, then computes stats via `endSession`. Uses the next session's `started_at` as an upper bound to avoid cross-session measurement contamination when the same sensor_id has multiple sessions.
+
+`sqlite3` CLI is not available on this machine — use Python to inspect the DB:
+```bash
+python3 -c "import sqlite3,os; db=sqlite3.connect(os.path.expanduser('~/.config/deskbike-app/deskbike.sqlite')); [print(r) for r in db.execute('SELECT sensor_id, started_at, ended_at FROM sessions ORDER BY started_at DESC LIMIT 10')]"
+```
+
+**Native addon ABI** — `better-sqlite3` is a native addon that must be compiled for a specific ABI. Electron 33 uses ABI 130 (Electron-internal); system Node 22/25 uses ABI 141. These never match — this is structural, not fixable by switching Node versions. `run.sh` maintains a `.native-cache/` directory with one compiled binary per runtime version, keyed by `node-{VER}` and `electron-{VER}`. On first run both are compiled; afterwards they are restored from cache in ~1s. See `docs/native-addon-abi.md` for full background.
 
 **Mock-only IPC features** — Add an optional method to `IBleHelper` (e.g. `setMockSpeedKmh?`) so `BleHelper` ignores it automatically. Register a `ble:mock-*` IPC handler in `handlers.ts` that calls `helper.method?.()`. Expose via preload and declare in `env.d.ts`.
 

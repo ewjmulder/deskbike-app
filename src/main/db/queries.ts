@@ -1,6 +1,6 @@
 // src/main/db/queries.ts
 
-import { eq, desc, and, gte, lte, isNotNull } from 'drizzle-orm'
+import { eq, desc, and, gte, lte, isNotNull, isNull } from 'drizzle-orm'
 import { randomUUID } from 'crypto'
 import { getDb } from './index'
 import { measurements, sessions, settings } from './schema'
@@ -156,6 +156,61 @@ export function setSetting<T>(key: string, value: T): void {
     .values({ key, value: encoded })
     .onConflictDoUpdate({ target: settings.key, set: { value: encoded } })
     .run()
+}
+
+export function touchSession(sessionId: string, endedAt: string): void {
+  const db = getDb()
+  db.update(sessions)
+    .set({ endedAt })
+    .where(eq(sessions.id, sessionId))
+    .run()
+}
+
+export function closeOrphanedSessions(): void {
+  const db = getDb()
+  const orphans = db
+    .select()
+    .from(sessions)
+    .where(isNull(sessions.endedAt))
+    .orderBy(desc(sessions.startedAt))
+    .all()
+
+  for (const session of orphans) {
+    // Find the next session for the same sensor to use as an upper bound,
+    // so we don't accidentally include measurements from a later session.
+    const nextSession = db
+      .select()
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.sensorId, session.sensorId),
+          gte(sessions.startedAt, session.startedAt)
+        )
+      )
+      .orderBy(sessions.startedAt)
+      .limit(2)
+      .all()
+      .find((s) => s.startedAt > session.startedAt)
+
+    const upperBound = nextSession?.startedAt
+
+    const lastMeasurement = db
+      .select()
+      .from(measurements)
+      .where(
+        and(
+          eq(measurements.sensorId, session.sensorId),
+          gte(measurements.timestampUtc, session.startedAt),
+          ...(upperBound ? [lte(measurements.timestampUtc, upperBound)] : [])
+        )
+      )
+      .orderBy(desc(measurements.timestampUtc))
+      .limit(1)
+      .all()[0]
+
+    const endedAt = lastMeasurement?.timestampUtc ?? session.startedAt
+    endSession(session.id, endedAt)
+  }
 }
 
 export function getSensorsWithSessions(): string[] {
