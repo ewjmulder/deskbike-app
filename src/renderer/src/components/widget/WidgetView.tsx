@@ -1,16 +1,7 @@
 // src/renderer/src/components/widget/WidgetView.tsx
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { parseRawCsc, computeDeltas, type CscRawFields } from '../../ble/csc-parser'
-
-const WHEEL_CIRCUMFERENCE_M = 2.105
-
-interface Metrics {
-  speedKmh: number | null
-  cadenceRpm: number | null
-  distanceM: number
-  elapsedS: number
-}
+import { useCscMetrics } from '../../ble/useCscMetrics'
 
 function fmt2(n: number): string {
   return n.toString().padStart(2, '0')
@@ -25,14 +16,12 @@ function formatDistance(meters: number): string {
 }
 
 export default function WidgetView(): React.JSX.Element {
-  const [metrics, setMetrics] = useState<Metrics>({ speedKmh: null, cadenceRpm: null, distanceM: 0, elapsedS: 0 })
   const [connected, setConnected] = useState(false)
+  const { metrics, processPacket, reset: resetMetrics } = useCscMetrics()
+  const [elapsedS, setElapsedS] = useState(0)
 
   const connectedRef = useRef(false)
-  const prevCscRef = useRef<CscRawFields | null>(null)
-  const prevTimestampRef = useRef<number | null>(null)
   const sessionStartRef = useRef<number | null>(null)
-  const distanceRef = useRef(0)
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const startElapsed = useCallback(() => {
@@ -40,21 +29,19 @@ export default function WidgetView(): React.JSX.Element {
     sessionStartRef.current = Date.now()
     elapsedIntervalRef.current = setInterval(() => {
       if (sessionStartRef.current) {
-        setMetrics((m) => ({ ...m, elapsedS: Math.floor((Date.now() - sessionStartRef.current!) / 1000) }))
+        setElapsedS(Math.floor((Date.now() - sessionStartRef.current!) / 1000))
       }
     }, 1000)
   }, [])
 
   const reset = useCallback(() => {
     if (elapsedIntervalRef.current) { clearInterval(elapsedIntervalRef.current); elapsedIntervalRef.current = null }
-    prevCscRef.current = null
-    prevTimestampRef.current = null
     sessionStartRef.current = null
-    distanceRef.current = 0
     connectedRef.current = false
     setConnected(false)
-    setMetrics({ speedKmh: null, cadenceRpm: null, distanceM: 0, elapsedS: 0 })
-  }, [])
+    resetMetrics()
+    setElapsedS(0)
+  }, [resetMetrics])
 
   useEffect(() => {
     const prevHtmlOverflow = document.documentElement.style.overflow
@@ -65,39 +52,13 @@ export default function WidgetView(): React.JSX.Element {
     document.body.style.overflow = 'hidden'
 
     window.deskbike.onData((raw) => {
-      const now = Date.now()
-      const parsed = parseRawCsc(new Uint8Array(raw))
+      processPacket(new Uint8Array(raw))
 
       if (!connectedRef.current) {
         connectedRef.current = true
         setConnected(true)
         startElapsed()
       }
-
-      if (prevCscRef.current && prevTimestampRef.current !== null) {
-        const deltas = computeDeltas(parsed, prevCscRef.current, now - prevTimestampRef.current)
-        let distanceDelta = 0
-        let speedKmh: number | null = null
-        let cadenceRpm: number | null = null
-        if (deltas.wheelRevsDiff !== null && deltas.wheelRevsDiff > 0 &&
-            deltas.wheelTimeDiff !== null && deltas.wheelTimeDiff > 0) {
-          distanceDelta = deltas.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
-          speedKmh = (distanceDelta / (deltas.wheelTimeDiff / 1024)) * 3.6
-          distanceRef.current += distanceDelta
-        }
-        if (deltas.crankRevsDiff !== null && deltas.crankRevsDiff > 0 &&
-            deltas.crankTimeDiff !== null && deltas.crankTimeDiff > 0) {
-          cadenceRpm = (deltas.crankRevsDiff / (deltas.crankTimeDiff / 1024)) * 60
-        }
-        setMetrics((m) => ({
-          ...m,
-          ...(speedKmh !== null && { speedKmh }),
-          ...(cadenceRpm !== null && { cadenceRpm }),
-          distanceM: distanceRef.current,
-        }))
-      }
-      prevCscRef.current = parsed
-      prevTimestampRef.current = now
     })
 
     window.deskbike.onDisconnected(reset)
@@ -107,7 +68,7 @@ export default function WidgetView(): React.JSX.Element {
       document.body.style.margin = prevBodyMargin
       document.body.style.overflow = prevBodyOverflow
     }
-  }, [startElapsed, reset])
+  }, [startElapsed, reset, processPacket])
 
   return (
     <div style={{
@@ -141,7 +102,7 @@ export default function WidgetView(): React.JSX.Element {
       <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#ccc', marginTop: 4 }}>
         <span>{metrics.cadenceRpm !== null ? `${Math.round(metrics.cadenceRpm)} RPM` : '— RPM'}</span>
         <span>{formatDistance(metrics.distanceM)}</span>
-        <span style={{ marginLeft: 'auto', color: '#666' }}>{formatDuration(metrics.elapsedS)}</span>
+        <span style={{ marginLeft: 'auto', color: '#666' }}>{formatDuration(elapsedS)}</span>
       </div>
     </div>
   )
