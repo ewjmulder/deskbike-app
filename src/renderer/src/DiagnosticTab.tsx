@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createBleAdapter } from './ble/adapter'
 import type { BleAdapter, DeviceInfo } from './ble/adapter'
-import { parseRawCsc, computeDeltas, type CscRawFields } from './ble/csc-parser'
+import { useCscMetrics } from './ble/useCscMetrics'
 import { useDevLog } from './useDevLog'
 import { formatDuration, formatDistance } from './format'
 
@@ -22,23 +22,18 @@ export default function DiagnosticTab() {
   const [sessionHistory, setSessionHistory] = useState<SessionRecord[]>([])
   const [connectedDeviceId, setConnectedDeviceId] = useState<string | null>(null)
   const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null)
-  const [liveSpeed, setLiveSpeed] = useState<number | null>(null)
-  const [liveCadence, setLiveCadence] = useState<number | null>(null)
-  const [sessionDistance, setSessionDistance] = useState(0)
   const [elapsedS, setElapsedS] = useState(0)
   const elapsedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const sessionIdRef = useRef<string | null>(null)
   const sessionStartPromiseRef = useRef<Promise<string> | null>(null)
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevCscRef = useRef<CscRawFields | null>(null)
-  const prevTimestampRef = useRef<number | null>(null)
-  const sessionDistanceRef = useRef(0)
   const connectedDeviceIdRef = useRef<string | null>(null)
   const isUnmountingRef = useRef(false)
 
   const INACTIVITY_MS = 2 * 60 * 1000
-  const WHEEL_CIRCUMFERENCE_M = 2.105
+
+  const { metrics, processPacket, reset: resetMetrics } = useCscMetrics()
 
   const MOCK_SPEED_MIN = 0
   const MOCK_SPEED_MAX = 40
@@ -112,13 +107,8 @@ export default function DiagnosticTab() {
     if (!resetUi || isUnmountingRef.current) return
     setSessionId(null)
     setSessionStartedAt(null)
-    setLiveSpeed(null)
-    setLiveCadence(null)
-    setSessionDistance(0)
-    sessionDistanceRef.current = 0
-    prevCscRef.current = null
-    prevTimestampRef.current = null
-  }, [])
+    resetMetrics()
+  }, [resetMetrics])
 
   useEffect(() => {
     return () => {
@@ -174,9 +164,9 @@ export default function DiagnosticTab() {
       await adapter.current!.selectDevice(
         deviceId,
         async (data) => {
-          const parsed = parseRawCsc(data)
           const now = Date.now()
           const timestampUtc = new Date(now).toISOString()
+          const parsed = processPacket(data)
 
           // Start session on first packet (sentinel prevents re-entry on concurrent packets)
           if (!sessionIdRef.current) {
@@ -210,34 +200,15 @@ export default function DiagnosticTab() {
             await endActiveSession()
           }, INACTIVITY_MS)
 
-          // Compute live speed/cadence from deltas
-          if (prevCscRef.current && prevTimestampRef.current !== null) {
-            const timeDiffMs = now - prevTimestampRef.current
-            const deltas = computeDeltas(parsed, prevCscRef.current, timeDiffMs)
-
-            if (deltas.wheelRevsDiff !== null && deltas.wheelRevsDiff > 0 &&
-                deltas.wheelTimeDiff !== null && deltas.wheelTimeDiff > 0) {
-              const distM = deltas.wheelRevsDiff * WHEEL_CIRCUMFERENCE_M
-              const timeS = deltas.wheelTimeDiff / 1024
-              setLiveSpeed((distM / timeS) * 3.6)
-              sessionDistanceRef.current += distM
-              setSessionDistance(sessionDistanceRef.current)
-            }
-
-            if (deltas.crankRevsDiff !== null && deltas.crankRevsDiff > 0 &&
-                deltas.crankTimeDiff !== null && deltas.crankTimeDiff > 0) {
-              setLiveCadence((deltas.crankRevsDiff / (deltas.crankTimeDiff / 1024)) * 60)
-            }
-          }
-          prevCscRef.current = parsed
-          prevTimestampRef.current = now
-
           // Existing hex display and save
           const hex = Array.from(data).map((b) => b.toString(16).padStart(2, '0')).join(' ')
           console.log(`[DiagnosticTab] data packet: ${hex}`)
           console.log(`[DiagnosticTab] parsed: wheel=${parsed.hasWheelData} crank=${parsed.hasCrankData} wheelRevs=${parsed.wheelRevs} crankRevs=${parsed.crankRevs}`)
           setPacketCount((n) => n + 1)
           setLastHex(hex)
+          if (sessionIdRef.current && sessionIdRef.current !== 'pending') {
+            window.deskbike.sessionHeartbeat(sessionIdRef.current, timestampUtc)
+          }
           window.deskbike.saveMeasurement({
             sensorId: deviceId,
             timestampUtc,
@@ -345,9 +316,9 @@ export default function DiagnosticTab() {
           }}>
             <span style={{ color: '#4f4', fontWeight: 'bold', fontSize: 12 }}>● ACTIVE SESSION</span>
             <span>{formatDuration(elapsedS)}</span>
-            {sessionDistance > 0 && <span>{formatDistance(sessionDistance)}</span>}
-            {liveSpeed !== null && <span>{liveSpeed.toFixed(1)} km/h</span>}
-            {liveCadence !== null && <span>{Math.round(liveCadence)} RPM</span>}
+            {metrics.distanceM > 0 && <span>{formatDistance(metrics.distanceM)}</span>}
+            {metrics.speedKmh !== null && <span>{metrics.speedKmh.toFixed(1)} km/h</span>}
+            {metrics.cadenceRpm !== null && <span>{Math.round(metrics.cadenceRpm)} RPM</span>}
           </div>
         )}
 
