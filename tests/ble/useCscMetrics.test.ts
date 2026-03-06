@@ -83,11 +83,28 @@ describe('computeSpeedFromWindow', () => {
     ]
     expect(computeSpeedFromWindow(records)).toBeNull()
   })
+
+  it('returns null when newest record has no wheel data', () => {
+    const records = [
+      rec(0,    100, 1000, null, null),
+      rec(1000, null, null, null, null),
+    ]
+    expect(computeSpeedFromWindow(records)).toBeNull()
+  })
 })
 
 describe('computeCadenceFromWindow', () => {
   it('returns null with fewer than 2 records', () => {
     expect(computeCadenceFromWindow([])).toBeNull()
+    expect(computeCadenceFromWindow([rec(0, null, null, 50, 1000)])).toBeNull()
+  })
+
+  it('returns null when crankRevsDiff is 0', () => {
+    const records = [
+      rec(0,    null, null, 50, 1000),
+      rec(1000, null, null, 50, 2024),
+    ]
+    expect(computeCadenceFromWindow(records)).toBeNull()
   })
 
   it('computes cadence correctly', () => {
@@ -116,6 +133,14 @@ describe('computeCadenceFromWindow', () => {
     const records = [
       rec(0,    null, null, null, null),
       rec(1000, null, null, 51,   2024),
+    ]
+    expect(computeCadenceFromWindow(records)).toBeNull()
+  })
+
+  it('returns null when newest record has no crank data', () => {
+    const records = [
+      rec(0,    null, null, 50, 1000),
+      rec(1000, null, null, null, null),
     ]
     expect(computeCadenceFromWindow(records)).toBeNull()
   })
